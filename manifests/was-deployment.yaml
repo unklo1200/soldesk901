@@ -18,6 +18,9 @@ spec:
         - name: ghcr-cred   
       containers:
         - name: was
-          image: ghcr.io/your-id/was:latest
+          image: ealen/echo-server:latest
+          env:
+            - name: PORT
+            value: "8080"
           ports:
             - containerPort: 8080
