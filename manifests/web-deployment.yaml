@@ -14,6 +14,8 @@ spec:
       labels:
         app: web
     spec:
+      imagePullSecrets:
+        - name: ghcr-cred
       containers:
         - name: web
           image: ghcr.io/your-id/web:latest
