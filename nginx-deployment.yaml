@@ -9,7 +9,7 @@ spec:
     server: https://kubernetes.default.svc
   source:
     path: .
-    repoURL: https://https://github.com/unklo1200/soldesk901.git
+    repoURL: https://github.com/unklo1200/soldesk901.git
     targetRevision: HEAD
   sources: []
   project: default
@@ -19,5 +19,3 @@ spec:
     automated:
       prune: false
       selfHeal: false
-
-#test
