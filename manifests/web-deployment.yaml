@@ -18,6 +18,6 @@ spec:
         - name: ghcr-cred
       containers:
         - name: web
-          image: ghcr.io/your-id/web:latest
+          image: nginx:1.25-alpine
           ports:
             - containerPort: 80
