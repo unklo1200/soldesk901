@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/your-id/your-repo.git'
+    repoURL: 'https://github.com/unklo1200/soldesk901.git'
     targetRevision: HEAD
     path: manifests    # 이 디렉토리 안의 yaml들을 배포
   destination:
