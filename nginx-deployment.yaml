@@ -4,12 +4,12 @@ metadata:
   name: nginx
 spec:
   destination:
-    name: ''
+    name: 'nginx'
     namespace: nginx
     server: https://kubernetes.default.svc
   source:
     path: .
-    repoURL: https://github.com/asdfkco/Argo_NGINX.git
+    repoURL: https://https://github.com/unklo1200/soldesk901.git
     targetRevision: HEAD
   sources: []
   project: default
