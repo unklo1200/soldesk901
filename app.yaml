@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: web-was-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/your-id/your-repo.git'
+    targetRevision: HEAD
+    path: manifests    # 이 디렉토리 안의 yaml들을 배포
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: webwas
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
