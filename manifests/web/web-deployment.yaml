@@ -13,9 +13,9 @@ spec:
     metadata:
       labels:
         app: web
-    spec:
-      imagePullSecrets:
-        - name: ghcr-cred
+    #spec:
+    #  imagePullSecrets:
+    #    - name: ghcr-cred
       containers:
         - name: web
           image: nginx:1.25-alpine
