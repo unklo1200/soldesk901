@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web-deploy
+  namespace: web
   labels:
     app: web
 spec:
@@ -13,11 +14,10 @@ spec:
     metadata:
       labels:
         app: web
-    #spec:
-    #  imagePullSecrets:
-    #    - name: ghcr-cred
-    containers:
-      - name: web
-        image: nginx:1.25-alpine
-        ports:
-          - containerPort: 80
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+
