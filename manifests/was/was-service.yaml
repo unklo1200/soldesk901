@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: was-svc
+  name: was
   labels:
     app: was
 spec:
