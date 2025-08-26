@@ -6,9 +6,10 @@ metadata:
   labels:
     app: web
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: web
   ports:
-    - port: 80
-      targetPort: 80
+    - port: 80          # 클러스터 내부 포트
+      targetPort: 80    # 컨테이너 포트
+      nodePort: 30080   # 외부에서 접속할 노드포트(30000~32767)
