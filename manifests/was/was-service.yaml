@@ -1,13 +1,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: was-svc
+  name: web-svc
+  namespace: web
   labels:
-    app: was
+    app: web
 spec:
-  type: ClusterIP   # 외부 노출 불필요, 내부에서만 호출
+  type: LoadBalancer
   ports:
-    - port: 8080
-      targetPort: 8080
+    - port: 80
+      targetPort: 80
   selector:
-    app: was
+    app: web
+
