@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: was-deploy
+  namespace: was
   labels:
     app: was
 spec:
@@ -13,9 +14,6 @@ spec:
     metadata:
       labels:
         app: was
-    spec:
-      #imagePullSecrets:
-      #  - name: ghcr-cred   
       containers:
         - name: was
           image: ealen/echo-server:latest
