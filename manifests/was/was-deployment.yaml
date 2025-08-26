@@ -14,8 +14,8 @@ spec:
       labels:
         app: was
     spec:
-      imagePullSecrets:
-        - name: ghcr-cred   
+      #imagePullSecrets:
+      #  - name: ghcr-cred   
       containers:
         - name: was
           image: ealen/echo-server:latest
