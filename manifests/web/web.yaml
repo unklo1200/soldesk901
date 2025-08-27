@@ -6,7 +6,7 @@ metadata:
   labels:
     app: web
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: web
@@ -14,7 +14,9 @@ spec:
     metadata:
       labels:
         app: web
-    spec:
+      spec:
+        imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: web
           image: ghcr.io/unklo1200/web-php-nginx:latest   # 변경됨
