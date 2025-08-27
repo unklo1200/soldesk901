@@ -39,22 +39,22 @@ spec:
           ports:
             - containerPort: 8000
           env:
-            - name: DB_HOST
-              value: "test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com"   # ← 예: mydb.abc123.ap-northeast-2.rds.amazonaws.com
-            - name: DB_PORT
-              value: "3306"
-            - name: DB_NAME
-              value: "test"
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: was-db-secret
-                  key: username
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: was-db-secret
-                  key: password
+        - name: DB_HOST
+          value: "test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com"
+        - name: DB_PORT
+          value: "3306"
+        - name: DB_NAME
+          value: "test"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: was-db-secret
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+            name: was-db-secret
+            key: password
           readinessProbe:
             httpGet:
               path: /api/health
