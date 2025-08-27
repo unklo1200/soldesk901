@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deploy
+  namespace: web
+  labels:
+    app: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/unklo1200/web-php-nginx:latest   # 변경됨
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          env:
+            - name: WAS_BASE_URL
+              value: "http://was-svc.was.svc.cluster.local:8000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-svc
+  namespace: web
+  labels:
+    app: web
+spec:
+  type: NodePort   # LoadBalancer → NodePort
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      nodePort: 30080   # EKS Worker Node IP:30080 으로 접근 가능
