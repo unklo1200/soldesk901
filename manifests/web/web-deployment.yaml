@@ -6,7 +6,7 @@ metadata:
   labels:
     app: web
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: web
@@ -15,8 +15,10 @@ spec:
       labels:
         app: web
     spec:
+      imagePullSecrets:
+        - name: ghcr-cred
       containers:
         - name: web
-          image: nginx:1.25-alpine
+          image: ghcr.io/unklo1200/web-php-nginx:lastest
           ports:
             - containerPort: 80
