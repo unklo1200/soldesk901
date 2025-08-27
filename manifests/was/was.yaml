@@ -1,8 +1,3 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: was
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -10,42 +5,38 @@ metadata:
   namespace: was
   labels: { app: was }
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels: { app: was }
   template:
     metadata:
       labels: { app: was }
     spec:
-      # GHCR Private → imagePullSecrets 필요
       imagePullSecrets:
         - name: ghcr-secret
       containers:
-        - name: was
-          image: ghcr.io/unklo1200/was-v1:latest
+        - name: was                                # ← 컨테이너 정의
+          image: ghcr.io/unklo1200/was-v1:latest   # ← 이미지 필수
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
-          env:
-        - name: DB_HOST
-          value: "test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com"
-        - name: DB_PORT
-          value: "3306"
-        - name: DB_NAME
-          value: "test"
-        - name: DB_USER
-          valueFrom:
-            secretKeyRef:
-              name: was-db-secret
-              key: username
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-            name: was-db-secret
-            key: password
-          resources:
-            requests: { cpu: "100m", memory: "128Mi" }
-            limits:   { cpu: "500m", memory: "512Mi" }
+          env:                                     # ← env는 이 레벨!
+            - name: DB_HOST
+              value: "test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com"
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_NAME
+              value: "test"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: was-db-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: was-db-secret
+                  key: password
           readinessProbe:
             httpGet: { path: /api/health, port: 8000 }
             initialDelaySeconds: 5
@@ -62,10 +53,10 @@ metadata:
   namespace: was
   labels: { app: was }
 spec:
-  type: NodePort
+  type: NodePort                # 필요 시 LoadBalancer로 변경 가능
   selector: { app: was }
   ports:
     - name: http
       port: 8000
       targetPort: 8000
-      nodePort: 30081  # 필요 시 변경 가능 (30000~32767)
+      nodePort: 30081
