@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: was
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: was-deploy
+  namespace: was
+  labels: { app: was }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: was }
+  template:
+    metadata:
+      labels: { app: was }
+    spec:
+      # GHCR Private → imagePullSecrets 필요
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: was
+          image: ghcr.io/unklo1200/was-v1:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            # RDS 연결이 필요하면 아래 Secret을 먼저 생성하고 주입하세요.
+            - name: DB_HOST
+              valueFrom: { secretKeyRef: { name: rds-conn, key: DB_HOST } }
+            - name: DB_USER
+              valueFrom: { secretKeyRef: { name: rds-conn, key: DB_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: rds-conn, key: DB_PASSWORD } }
+            - name: DB_NAME
+              valueFrom: { secretKeyRef: { name: rds-conn, key: DB_NAME } }
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: 8000 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: was-svc
+  namespace: was
+  labels: { app: was }
+spec:
+  type: NodePort
+  selector: { app: was }
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      nodePort: 30081  # 필요 시 변경 가능 (30000~32767)
