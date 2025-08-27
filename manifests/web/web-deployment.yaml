@@ -22,3 +22,4 @@ spec:
           image: ghcr.io/unklo1200/web-php-nginx:lastest
           ports:
             - containerPort: 80
+          imagePullPolicy: Always
