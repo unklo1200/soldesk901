@@ -3,34 +3,22 @@ kind: Namespace
 metadata:
   name: was
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: was-db-secret
-  namespace: was
-type: Opaque
-stringData:
-  username: "admin"
-  password: "adminadmin"
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: was-deploy
   namespace: was
-  labels:
-    app: was
+  labels: { app: was }
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: was
+    matchLabels: { app: was }
   template:
     metadata:
-      labels:
-        app: was
+      labels: { app: was }
     spec:
-        imagePullSecrets:
+      # GHCR Private → imagePullSecrets 필요
+      imagePullSecrets:
         - name: ghcr-secret
       containers:
         - name: was
@@ -55,39 +43,29 @@ spec:
             secretKeyRef:
             name: was-db-secret
             key: password
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
           readinessProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
+            httpGet: { path: /api/health, port: 8000 }
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
+            httpGet: { path: /api/health, port: 8000 }
             initialDelaySeconds: 15
             periodSeconds: 20
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "256Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: was-svc
   namespace: was
-  labels:
-    app: was
+  labels: { app: was }
 spec:
   type: NodePort
-  selector:
-    app: was
+  selector: { app: was }
   ports:
     - name: http
       port: 8000
       targetPort: 8000
-      nodePort: 30081
+      nodePort: 30081  # 필요 시 변경 가능 (30000~32767)
