@@ -1,46 +1,102 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: was
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: was-sa
+  namespace: was
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: web-deploy
-  namespace: web
-  labels: { app: web }
+  name: was-deploy
+  namespace: was
+  labels:
+    app: was
 spec:
-  replicas: 2
+  replicas: 1
   selector:
-    matchLabels: { app: web }
+    matchLabels:
+      app: was
   template:
     metadata:
-      labels: { app: web }
+      labels:
+        app: was
     spec:
-      imagePullSecrets:
-        - name: ghcr-secret
+      serviceAccountName: was-sa
       containers:
-        - name: web
-          image: ghcr.io/unklo1200/web-php-nginx:latest
-          imagePullPolicy: IfNotPresent
+        - name: was
+          image: ghcr.io/unklo1200/was:latest   # ← 실제 WAS 이미지로 교체 가능
           ports:
-            - containerPort: 80          # ← 실제 리슨 포트가 80인지 확인(8080이면 둘 다 8080으로)
-          # 앱이 완전히 뜰 때까지 대기 (이 동안 liveness/readiness는 평가되지 않음)
-          startupProbe:
+            - containerPort: 8000
+          livenessProbe:
             httpGet:
-              path: /
-              port: 80
-            periodSeconds: 2
-            failureThreshold: 30          # 최대 60초 대기 (2s × 30)
-            timeoutSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 80
+              path: /api/health
+              port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
-          livenessProbe:
+          readinessProbe:
             httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 30
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            failureThreshold: 30
+            periodSeconds: 2
+            timeoutSeconds: 5
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: was-svc
+  namespace: was
+spec:
+  type: ClusterIP
+  selector:
+    app: was
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: was-ing
+  namespace: was
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: myapp
+    alb.ingress.kubernetes.io/group.order: "20"
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: was-svc
+                port:
+                  number: 8000
