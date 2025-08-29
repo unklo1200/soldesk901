@@ -1,0 +1,99 @@
+# 1) DB 자격증명: Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: was
+type: Opaque
+stringData:
+  username: admin
+  password: "adminadmin"
+---
+# 2) DB 접속정보: ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-config
+  namespace: was
+data:
+  DB_HOST: "test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com"
+  DB_NAME: "test"
+---
+# 3) WAS Deployment (+ Secret/ConfigMap 연동)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: was-deploy
+  namespace: was
+  labels:
+    app: was
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: was
+  template:
+    metadata:
+      labels:
+        app: was
+    spec:
+      containers:
+      - name: was
+        # ↓ 네가 쓰는 WAS 이미지로 바꿔도 OK (예: ghcr.io/unklo1200/was:latest)
+        image: ghcr.io/unklo1200/was:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: db-config
+              key: DB_HOST
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: db-config
+              key: DB_NAME
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        # 선택: 헬스체크 엔드포인트가 있다면 활성화 (예: /api/health)
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          timeoutSeconds: 2
+---
+# 4) WAS ClusterIP Service (웹/인그레스에서 백엔드로 붙는 대상)
+apiVersion: v1
+kind: Service
+metadata:
+  name: was-svc
+  namespace: was
+  labels:
+    app: was
+spec:
+  type: ClusterIP
+  selector:
+    app: was
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
