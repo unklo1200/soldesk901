@@ -4,18 +4,24 @@ metadata:
   name: was
 ---
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: was-sa
+  namespace: was
+imagePullSecrets:
+  - name: ghcr-pull-secret
+---
+apiVersion: v1
 kind: Secret
 metadata:
   name: was-db-secret
   namespace: was
 type: Opaque
 stringData:
-  # Credentials (as requested)
   DB_USERNAME: "admin"
-  DB_PASSWORD: "adminadmin"
-  # Common aliases some apps expect
+  DB_PASSWORD: "your passwd"
   MYSQL_USER: "admin"
-  MYSQL_PASSWORD: "adminadmin"
+  MYSQL_PASSWORD: "your passwd"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -23,13 +29,10 @@ metadata:
   name: was-db-config
   namespace: was
 data:
-  # RDS endpoint & database name
   DB_HOST: "test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com"
   DB_NAME: "test"
-  # Common aliases some apps expect
   MYSQL_HOST: "test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com"
   MYSQL_DATABASE: "test"
-  # If your app uses a single URL, consider setting DATABASE_URL directly in the Deployment env (commented example below).
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -48,11 +51,13 @@ spec:
       labels:
         app: was
     spec:
+      serviceAccountName: was-sa
       nodeSelector:
         eks.amazonaws.com/nodegroup: ng-was
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: was
-          # TODO: replace with your actual WAS image if different
           image: ghcr.io/unklo1200/was:latest
           imagePullPolicy: IfNotPresent
           ports:
@@ -62,10 +67,6 @@ spec:
                 name: was-db-secret
             - configMapRef:
                 name: was-db-config
-          # If your app expects a single DATABASE_URL, uncomment and adjust the driver:
-          # env:
-          #   - name: DATABASE_URL
-          #     value: "mysql+pymysql://admin:your passwd@test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com/test"
           readinessProbe:
             httpGet:
               path: /api/health
@@ -85,9 +86,6 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-      # If pulling from a private GHCR, add imagePullSecrets here
-      # imagePullSecrets:
-      #   - name: ghcr-creds
 ---
 apiVersion: v1
 kind: Service
@@ -106,7 +104,6 @@ spec:
       targetPort: 8000
       protocol: TCP
 ---
-# (Optional) Allow only the 'web' namespace to reach WAS over port 8000
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
