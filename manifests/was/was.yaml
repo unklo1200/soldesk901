@@ -48,6 +48,8 @@ spec:
       labels:
         app: was
     spec:
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: ng-was
       containers:
         - name: was
           # TODO: replace with your actual WAS image if different
