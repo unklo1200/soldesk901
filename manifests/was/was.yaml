@@ -1,19 +1,25 @@
----
+# 1) DB 자격증명: Secret
 apiVersion: v1
-kind: Namespace
+kind: Secret
 metadata:
-  name: was
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: was-sa
+  name: db-credentials
   namespace: was
-imagePullSecrets:
-  - name: ghcr-pull-secret
-
+type: Opaque
+stringData:
+  username: admin
+  password: "adminadmin"
 ---
+# 2) DB 접속정보: ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-config
+  namespace: was
+data:
+  DB_HOST: "test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com"
+  DB_NAME: "test"
+---
+# 3) WAS Deployment (+ Secret/ConfigMap 연동)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -31,72 +37,63 @@ spec:
       labels:
         app: was
     spec:
-      serviceAccountName: was-sa
       containers:
-        - name: was
-          image: ghcr.io/unklo1200/was:latest   # ← 실제 WAS 이미지로 교체 가능
-          ports:
-            - containerPort: 8000
-          livenessProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 5
-          startupProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
-            failureThreshold: 30
-            periodSeconds: 2
-            timeoutSeconds: 5
-      imagePullSecrets:
-        - name: ghcr-pull-secret
-
+      - name: was
+        # ↓ 네가 쓰는 WAS 이미지로 바꿔도 OK (예: ghcr.io/unklo1200/was:latest)
+        image: ghcr.io/unklo1200/was:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: db-config
+              key: DB_HOST
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: db-config
+              key: DB_NAME
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        # 선택: 헬스체크 엔드포인트가 있다면 활성화 (예: /api/health)
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          timeoutSeconds: 2
 ---
+# 4) WAS ClusterIP Service (웹/인그레스에서 백엔드로 붙는 대상)
 apiVersion: v1
 kind: Service
 metadata:
   name: was-svc
   namespace: was
+  labels:
+    app: was
 spec:
   type: ClusterIP
   selector:
     app: was
   ports:
-    - name: http
-      port: 8000
-      targetPort: 8000
-
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: was-ing
-  namespace: was
-  annotations:
-    kubernetes.io/ingress.class: alb
-    alb.ingress.kubernetes.io/scheme: internal
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/group.name: myapp
-    alb.ingress.kubernetes.io/group.order: "20"
-    alb.ingress.kubernetes.io/healthcheck-path: /api/health
-spec:
-  rules:
-    - http:
-        paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: was-svc
-                port:
-                  number: 8000
+  - name: http
+    port: 8000
+    targetPort: 8000
