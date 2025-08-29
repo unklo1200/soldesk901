@@ -16,17 +16,14 @@ kind: Deployment
 metadata:
   name: web-deploy
   namespace: web
-  labels:
-    app: web
+  labels: { app: web }
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: web
+    matchLabels: { app: web }
   template:
     metadata:
-      labels:
-        app: web
+      labels: { app: web }
     spec:
       serviceAccountName: web-sa
       nodeSelector:
@@ -42,44 +39,54 @@ spec:
           env:
             - name: WAS_BASE_URL
               value: "http://was-svc.was.svc.cluster.local:8000"
-          # More forgiving probes that only check the port is open
           startupProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz.txt
               port: 80
             periodSeconds: 2
-            failureThreshold: 90   # ~180s grace
-            timeoutSeconds: 1
+            failureThreshold: 90
+            timeoutSeconds: 2
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz.txt
               port: 80
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 6
-          # Liveness after the container had time to warm up
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz.txt
               port: 80
             initialDelaySeconds: 60
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 3
           resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+          volumeMounts:
+            - name: healthz
+              mountPath: /var/www/html/healthz.txt
+              subPath: healthz.txt
+              readOnly: true
+      volumes:
+        - name: healthz
+          configMap:
+            name: web-healthz
+            items:
+              - key: healthz.txt
+                path: healthz.txt
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: web-svc
   namespace: web
-  labels:
-    app: web
+  labels: { app: web }
 spec:
-  type: ClusterIP
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - "43.202.47.62/32"    # 네 IP만 허용 (원하면 지우거나 범위 확장)
   selector:
     app: web
   ports:
