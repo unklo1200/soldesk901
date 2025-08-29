@@ -58,7 +58,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: was
-          image: ghcr.io/unklo1200/was:latest
+          image: ghcr.io/unklo1200/was-v1:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
