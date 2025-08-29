@@ -29,6 +29,8 @@ spec:
       labels:
         app: web
     spec:
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: ng-web
       serviceAccountName: web-sa
       containers:
         - name: web
