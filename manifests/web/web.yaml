@@ -42,18 +42,29 @@ spec:
           env:
             - name: WAS_BASE_URL
               value: "http://was-svc.was.svc.cluster.local:8000"
+          # Give the container time to fully boot (nginx + php-fpm) before liveness kicks in
+          startupProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 2
+            failureThreshold: 60     # up to ~120s for cold starts
+            timeoutSeconds: 3
           readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
             httpGet:
               path: /
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 30
-            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
           resources:
             requests:
               cpu: "100m"
