@@ -32,7 +32,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: web
-          image: ghcr.io/unklo1200/web-php-nginx:latest
+          image: ghcr.io/unklo1200/web-php
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
