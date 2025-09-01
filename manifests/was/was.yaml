@@ -14,35 +14,30 @@ imagePullSecrets:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: was-db-secret
+  name: db-secret
   namespace: was
 type: Opaque
 stringData:
-  DB_USERNAME: "admin"
   DB_PASSWORD: "adminadmin"
-  MYSQL_USER: "admin"
-  MYSQL_PASSWORD: "adminadmin"
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: was-db-config
+  name: db-config
   namespace: was
 data:
   DB_HOST: "test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com"
   DB_NAME: "test"
-  MYSQL_HOST: "test.cl6k4y6qsqhk.ap-northeast-2.rds.amazonaws.com"
-  MYSQL_DATABASE: "test"
+  DB_USER: "admin"
+  DB_PORT: "3306"
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: was-deploy
   namespace: was
-  labels:
-    app: was
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: was
@@ -51,79 +46,54 @@ spec:
       labels:
         app: was
     spec:
-      serviceAccountName: was-sa
-      nodeSelector:
-        eks.amazonaws.com/nodegroup: ng-was
       imagePullSecrets:
-        - name: ghcr-pull-secret
+        - name: ghcr-pull-secret   # TODO: GHCR 프라이빗 토큰으로 미리 생성
       containers:
         - name: was
           image: ghcr.io/unklo1200/was-api
-          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
-          envFrom:
-            - secretRef:
-                name: was-db-secret
-            - configMapRef:
-                name: was-db-config
+          env:
+            - name: DB_HOST
+              valueFrom: { configMapKeyRef: { name: db-config, key: DB_HOST } }
+            - name: DB_NAME
+              valueFrom: { configMapKeyRef: { name: db-config, key: DB_NAME } }
+            - name: DB_USER
+              valueFrom: { configMapKeyRef: { name: db-config, key: DB_USER } }
+            - name: DB_PORT
+              valueFrom: { configMapKeyRef: { name: db-config, key: DB_PORT } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: db-secret, key: DB_PASSWORD } }
           readinessProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
-            initialDelaySeconds: 10
+            httpGet: { path: /api/health, port: 8000 }
+            initialDelaySeconds: 5
             periodSeconds: 10
-            timeoutSeconds: 3
-            failureThreshold: 6
           livenessProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
-            initialDelaySeconds: 30
+            httpGet: { path: /api/health, port: 8000 }
+            initialDelaySeconds: 10
             periodSeconds: 20
-            timeoutSeconds: 3
-            failureThreshold: 3
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: was-svc
+  name: was-nlb
   namespace: was
-  labels:
-    app: was
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    # (선택) 크로스존 활성화
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    # (선택) 헬스체크 HTTP로 지정
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8000"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/api/health"
 spec:
-  type: ClusterIP
-  selector:
-    app: was
+  type: LoadBalancer
   ports:
     - name: http
-      port: 8000
-      targetPort: 8000
+      port: 8000         # NLB가 노출하는 포트
+      targetPort: 8000   # 컨테이너 포트
       protocol: TCP
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: was-allow-web-only
-  namespace: was
-spec:
-  podSelector:
-    matchLabels:
-      app: was
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: web
-      ports:
-        - protocol: TCP
-          port: 8000
+  selector:
+    app: was
