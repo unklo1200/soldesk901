@@ -19,9 +19,9 @@ metadata:
 type: Opaque
 stringData:
   DB_USERNAME: "admin"
-  DB_PASSWORD: "your passwd"
+  DB_PASSWORD: "adminadmin"
   MYSQL_USER: "admin"
-  MYSQL_PASSWORD: "your passwd"
+  MYSQL_PASSWORD: "adminadmin"
 ---
 apiVersion: v1
 kind: ConfigMap
