@@ -82,7 +82,8 @@ metadata:
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /healthz
     # (옵션) 스티키 세션 (ALB L7 쿠키 기반)
-    alb.ingress.kubernetes.io/load-balancer-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=3600
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.type=lb_cookie,stickiness.lb_cookie.duration_seconds=3600
+
 spec:
   rules:
     - http:
