@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: web
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,25 +18,42 @@ spec:
       labels:
         app: web
     spec:
+      # GHCR 프라이빗 이미지 풀 시크릿 (미리 생성 필요)
       imagePullSecrets:
-        - name: ghcr-pull-secret   # TODO: GHCR 프라이빗 토큰으로 미리 생성
+        - name: ghcr-pull-secret
+      # ng-web 노드그룹으로 고정
+      nodeSelector:
+        role: "web"
       containers:
         - name: web
           image: ghcr.io/unklo1200/web-php
           ports:
             - containerPort: 80
           env:
-            # 내부 NLB를 가리키는 URL(ExternalName 서비스)
+            # (옵션 A) NLB 경유로 WAS 호출 — 아래 ExternalName svc 사용 시
             - name: WAS_BASE_URL
               value: "http://was-nlb.web.svc.cluster.local:8000"
+            # (옵션 B) 쿠버네티스 내부 DNS 직접호출 원한다면 위 env 대신:
+            # value: "http://was-svc.was.svc.cluster.local:8000"
           readinessProbe:
-            httpGet: { path: /healthz, port: 80 }
+            httpGet:
+              path: /healthz
+              port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
-            httpGet: { path: /healthz, port: 80 }
+            httpGet:
+              path: /healthz
+              port: 80
             initialDelaySeconds: 10
             periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
@@ -51,6 +69,7 @@ spec:
       port: 80
       targetPort: 80
 ---
+# ALB(인터넷 공개) Ingress
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -62,6 +81,8 @@ metadata:
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    # (옵션) 스티키 세션 (ALB L7 쿠키 기반)
+    alb.ingress.kubernetes.io/load-balancer-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=3600
 spec:
   rules:
     - http:
@@ -73,8 +94,9 @@ spec:
                 name: web-svc
                 port:
                   number: 80
-
 ---
+# (옵션 A) web → NLB → was 흐름 강제 시, NLB DNS를 감싸는 ExternalName Service
+# apply 후, was NLB의 DNS를 확인해서 아래 externalName에 교체
 apiVersion: v1
 kind: Service
 metadata:
@@ -82,4 +104,4 @@ metadata:
   namespace: web
 spec:
   type: ExternalName
-  externalName: placeholder.internal-nlb-dns.example.com  # TODO: NLB DNS로 교체
+  externalName: REPLACE_ME_WITH_INTERNAL_NLB_DNS   # 예: internal-aws-xxxxxxxx.ap-northeast-2.elb.amazonaws.com
