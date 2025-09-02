@@ -110,6 +110,8 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
     service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8000"
     service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/api/health"
+    external-dns.alpha.kubernetes.io/hostname: was.${private_domain}
+    external-dns.alpha.kubernetes.io/ttl: "60"
 spec:
   type: LoadBalancer
   selector:
