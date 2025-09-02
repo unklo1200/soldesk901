@@ -26,7 +26,7 @@ spec:
         role: "web"
       containers:
         - name: web
-          image: ghcr.io/unklo1200/web-php
+          image: ghcr.io/unklo1200/web_http
           ports:
             - containerPort: 80
           env:
