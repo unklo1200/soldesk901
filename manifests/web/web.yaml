@@ -85,6 +85,7 @@ metadata:
     alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.type=lb_cookie,stickiness.lb_cookie.duration_seconds=3600
 
 spec:
+  ingressClassName: alb   # 가능하면 이 필드도 함께 사용 (annotation과 중복 OK)
   rules:
     - http:
         paths:
