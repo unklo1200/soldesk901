@@ -105,4 +105,4 @@ metadata:
   namespace: web
 spec:
   type: ExternalName
-  externalName: REPLACE_ME_WITH_INTERNAL_NLB_DNS   # 예: internal-aws-xxxxxxxx.ap-northeast-2.elb.amazonaws.com
+  externalName: was.${private_domain} # 고정 FQDN
