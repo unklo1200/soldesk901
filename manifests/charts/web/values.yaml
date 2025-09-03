@@ -1,0 +1,44 @@
+image:
+  repository: ghcr.io/unklo1200/web-php
+  tag: "latest"
+  pullPolicy: IfNotPresent
+imagePullSecrets:
+  - name: ghcr-pull-secret    # GHCR가 public이면 이 두 줄 삭제 가능
+
+replicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 80
+
+# 여기만 ArgoCD에서 주입해주면 됩니다.
+privateDomain: "example.local"   # <- Terraform var.private_domain과 동일 값으로 override 예정
+
+was:
+  # web → was 호출 URL (NLB + Route53 기준)
+  baseURLTemplate: "http://was.{{ .Values.privateDomain }}:8000"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+---
+ingress:
+  enabled: true
+  className: alb                 # AWS Load Balancer Controller
+  scheme: internet-facing        # or "internal"
+  targetType: ip                 # ip 권장
+  groupName: ""                  # 여러 Ingress를 하나의 ALB로 묶고 싶으면 이름 지정
+  hosts:
+    # host를 비우면 ALB DNS로만 접근 (도메인 없음)
+    - host: ""                   # 예: "web.example.com" 넣으면 Host 기반 라우팅
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    enabled: false
+    certificateArn: ""           # HTTPS 쓰면 ACM ARN 입력 + enabled=true
