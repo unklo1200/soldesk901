@@ -12,6 +12,29 @@ spec:
     metadata:
       labels: { app: web }
     spec:
+      volumes:
+        - name: nginx-conf
+          configMap: { name: web-nginx }
+      containers:
+        - name: web
+          # ...
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/zz-catchall.conf
+              subPath: zz-catchall.conf
+              readOnly: true
+          readinessProbe:
+            httpGet: { path: "/", port: 80 }
+            initialDelaySeconds: 20
+            timeoutSeconds: 3
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: { path: "/", port: 80 }
+            initialDelaySeconds: 40
+            timeoutSeconds: 3
+            periodSeconds: 20
+            failureThreshold: 6
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
       {{- toYaml .Values.imagePullSecrets | nindent 6 }}
