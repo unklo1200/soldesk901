@@ -9,7 +9,7 @@ data:
   DB_HOST: dGVzdC5jbDZrNHk2cXNxaGsuYXAtbm9ydGhlYXN0LTIucmRzLmFtYXpvbmF3cy5jb20=
   DB_NAME: dGVzdA==
   DB_USER: YWRtaW4=
-  DB_PASSWORD: eW91ciBwYXNzd2Q=   # 'your passwd' (공개 저장소라면 보안상 Secret은 Git에 올리지 않는게 좋습니다)
+  DB_PASSWORD: YWRtaW5hZG1pbg==   # 'your passwd' (공개 저장소라면 보안상 Secret은 Git에 올리지 않는게 좋습니다)
 
 ---
 apiVersion: apps/v1
