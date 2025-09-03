@@ -24,7 +24,7 @@ spec:
             - containerPort: 80
           env:
             - name: WAS_BASE_URL
-              value: {{ tpl .Values.was.baseURLTemplate . | quote }}
+              value: "http://was.{{ .Values.privateDomain }}:8000"
           readinessProbe:
             tcpSocket: { port: 80 }
             initialDelaySeconds: 5

@@ -11,8 +11,7 @@ service:
   type: ClusterIP
   port: 80
 
-# 여기만 ArgoCD에서 주입해주면 됩니다.
-privateDomain: "example.local"   # <- Terraform var.private_domain과 동일 값으로 override 예정
+privateDomain: "projecteks.local"  # Terraform이 var.private_domain으로 주입
 
 was:
   # web → was 호출 URL (NLB + Route53 기준)
