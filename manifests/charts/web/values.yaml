@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/unklo1200/web-php
+  repository: ghcr.io/unklo1200/web_http
   tag: "latest"
   pullPolicy: IfNotPresent
 imagePullSecrets:
