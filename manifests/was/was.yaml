@@ -68,19 +68,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: was            # <- FQDN 자동화를 위해 이름을 'was'로 권장
+  name: was
   namespace: was
-  labels:
-    app: was
+  labels: { app: was }
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"     # 내부형
-    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"  # IP 타겟 권장
-
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
 spec:
   type: LoadBalancer
-  selector:
-    app: was
+  selector: { app: was }
   ports:
     - name: http
       port: 8000

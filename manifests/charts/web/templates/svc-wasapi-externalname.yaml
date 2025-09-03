@@ -1,0 +1,10 @@
+{{- if eq .Values.backend.mode "externalName" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: was-api
+  namespace: web
+spec:
+  type: ExternalName
+  externalName: {{ .Values.backend.host | quote }}   # e.g., was.projecteks.local
+{{- end }}
