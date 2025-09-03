@@ -1,16 +1,23 @@
+replicaCount: 2
+
 image:
   repository: ghcr.io/unklo1200/web_http
   tag: latest
+  pullPolicy: IfNotPresent
   pullSecrets:
     - ghcr-pull-secret
 
+# Terraform의 argocd-apps에서 privateDomain을 주입합니다.
 privateDomain: "projecteks.local"
 
+# web 컨테이너가 참조하는 upstream 이름 'was-api'를
+# Route53 프라이빗 도메인으로 연결합니다.
 backend:
-  mode: externalName               # externalName | clusterDNS
-  host: was.projecteks.local       # ← 여기만 바꾸면 경로 전환 가능
+  mode: externalName              # 외부로 강제 연결 (프라이빗 Route53)
+  host: was.projecteks.local      # was 서비스의 프라이빗 도메인 (ExternalDNS가 생성)
 
 service:
+  type: ClusterIP
   port: 80
 
 ingress:
@@ -18,8 +25,3 @@ ingress:
   className: alb
   scheme: internet-facing
   targetType: ip
-  hosts:
-    - host: ""
-      paths:
-        - path: /
-          pathType: Prefix

@@ -3,33 +3,46 @@ kind: Deployment
 metadata:
   name: web-deploy
   namespace: web
-  labels: { app: web }
+  labels:
+    app: web
 spec:
-  replicas: 2
-  selector: { matchLabels: { app: web } }
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: web
   template:
     metadata:
-      labels: { app: web }
+      labels:
+        app: web
     spec:
+      {{- if .Values.image.pullSecrets }}
       imagePullSecrets:
-        - name: ghcr-pull-secret
+      {{- range .Values.image.pullSecrets }}
+        - name: {{ . | quote }}
+      {{- end }}
+      {{- end }}
       containers:
         - name: web
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - containerPort: 80
           env:
-            # 앱에서 직접 호출할 일 있으면 유지
+            # 앱에서 직접 호출할 일이 있을 수 있어 유지
             - name: WAS_BASE_URL
               value: "http://was.{{ .Values.privateDomain }}:8000"
           readinessProbe:
-            httpGet: { path: "/", port: 80 }
+            httpGet:
+              path: /
+              port: 80
             initialDelaySeconds: 20
             timeoutSeconds: 3
             periodSeconds: 10
             failureThreshold: 6
           livenessProbe:
-            httpGet: { path: "/", port: 80 }
+            httpGet:
+              path: /
+              port: 80
             initialDelaySeconds: 40
             timeoutSeconds: 3
             periodSeconds: 20
