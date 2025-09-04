@@ -1,12 +1,44 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: web-nginx
+  name: web-nginx-conf
   namespace: web
 data:
-  zz-catchall.conf: |
+  default.conf: |
     server {
-      listen 80;
+      listen 80 default_server;
       server_name _;
-      location / { return 200 'ok'; }
+
+      root /var/www/html;
+      index index.php index.html index.htm;
+      client_max_body_size 20m;
+
+      # 정적/프론트
+      location / {
+        try_files $uri $uri/ /index.html?$args;
+      }
+
+      # ★ API 프록시
+      # location에 슬래시(/)가 있으면 proxy_pass도 /로 끝나야 path가 깨지지 않아요!
+      location /api/ {
+        proxy_pass http://was-svc.was.svc.cluster.local:8000/;
+        proxy_http_version 1.1;
+        proxy_set_header Host               $host;
+        proxy_set_header X-Real-IP          $remote_addr;
+        proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto  $scheme;
+        proxy_set_header Connection         "";
+
+        # (선택) 브라우저 CORS 오류가 보이면 켜주세요
+        add_header Access-Control-Allow-Origin  $http_origin always;
+        add_header Access-Control-Allow-Methods "GET,POST,PUT,PATCH,DELETE,OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Authorization,Content-Type,X-Requested-With" always;
+        if ($request_method = OPTIONS) { return 204; }
+      }
+
+      location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass unix:/run/php-fpm/www.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+      }
     }
