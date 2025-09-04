@@ -2,48 +2,148 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web-deploy
-  namespace: web
+  namespace: {{ .Release.Namespace }}
   labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
     app: web
+  {{- with .Values.deploymentAnnotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+  {{- end }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  {{- if not .Values.hpa.enabled }}
+  replicas: {{ .Values.replicaCount | default 2 }}
+  {{- end }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit | default 5 }}
   selector:
     matchLabels:
+      app.kubernetes.io/name: web
+      app.kubernetes.io/instance: {{ .Release.Name }}
       app: web
   template:
     metadata:
       labels:
+        app.kubernetes.io/name: web
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion }}
         app: web
+      {{- with .Values.podAnnotations }}
+      annotations:
+{{ toYaml . | indent 8 }}
+      {{- end }}
     spec:
-      {{- if .Values.image.pullSecrets }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ .Values.serviceAccount.name | default "web-sa" }}
+      {{- else }}
+      serviceAccountName: {{ .Values.serviceAccount.name | default "default" }}
+      {{- end }}
+
+      {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
-      {{- range .Values.image.pullSecrets }}
-        - name: {{ . | quote }}
+{{ toYaml . | indent 8 }}
       {{- end }}
+
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+{{ toYaml . | indent 8 }}
       {{- end }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+
+      {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+
       containers:
         - name: web
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.image.repository | default "ghcr.io/unklo1200/web_http" }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - containerPort: 80
+            - name: http
+              containerPort: {{ .Values.containerPort | default 80 }}
+
+          {{- if .Values.command }}
+          command:
+{{ toYaml .Values.command | indent 12 }}
+          {{- end }}
+          {{- if .Values.args }}
+          args:
+{{ toYaml .Values.args | indent 12 }}
+          {{- end }}
+
+          {{- if or .Values.env .Values.envFromConfigMaps .Values.envFromSecrets }}
           env:
-            # 앱에서 직접 호출할 일이 있을 수 있어 유지
-            - name: WAS_BASE_URL
-              value: "http://was.{{ .Values.privateDomain }}:8000"
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 20
-            timeoutSeconds: 3
-            periodSeconds: 10
-            failureThreshold: 6
+            {{- range $i, $e := (.Values.env | default list) }}
+            - name: {{ $e.name }}
+              value: {{ $e.value | quote }}
+            {{- end }}
+          envFrom:
+            {{- range $cm := (.Values.envFromConfigMaps | default list) }}
+            - configMapRef:
+                name: {{ $cm }}
+            {{- end }}
+            {{- range $sec := (.Values.envFromSecrets | default list) }}
+            - secretRef:
+                name: {{ $sec }}
+            {{- end }}
+          {{- end }}
+
+          {{- with .Values.lifecycle }}
+          lifecycle:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+
+          {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 40
-            timeoutSeconds: 3
-            periodSeconds: 20
-            failureThreshold: 6
+              path: {{ .Values.livenessProbe.path | default "/" }}
+              port: http
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds | default 10 }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds | default 10 }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds | default 2 }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold | default 3 }}
+          {{- end }}
+
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.path | default "/" }}
+              port: http
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds | default 5 }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds | default 10 }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds | default 2 }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold | default 3 }}
+          {{- end }}
+
+          {{- with .Values.resources }}
+          resources:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+
+          {{- with .Values.extraVolumeMounts }}
+          volumeMounts:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+
+      {{- with .Values.extraVolumes }}
+      volumes:
+{{ toYaml . | indent 8 }}
+      {{- end }}

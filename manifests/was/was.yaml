@@ -15,54 +15,59 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: was-deploy
+  name: was
   namespace: was
-  labels:
-    app: was
+  labels: { app: was }
 spec:
   replicas: 2
   selector:
-    matchLabels:
-      app: was
+    matchLabels: { app: was }
   template:
     metadata:
-      labels:
-        app: was
+      labels: { app: was }
     spec:
-      # GHCR가 private일 때 필요
-      imagePullSecrets:
-        - name: ghcr-pull-secret
+      nodeSelector:
+        role: "was"
+      tolerations:
+        - key: "role"
+          operator: "Equal"
+          value: "was"
+          effect: "NoSchedule"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: "role"
+                    operator: In
+                    values: ["was"]
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: ["was"]
+                topologyKey: "kubernetes.io/hostname"
       containers:
         - name: was
           image: ghcr.io/unklo1200/was-api
           imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 8000
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
           envFrom:
             - secretRef:
                 name: was-db-secret
-          # 애플리케이션이 제공하는 헬스 엔드포인트 사용
-          readinessProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 2
-          livenessProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
-            initialDelaySeconds: 15
-            periodSeconds: 20
-            timeoutSeconds: 2
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: "500m"
-              memory: 512Mi
+          ports:
+            - name: http
+              containerPort: 8000
 
 ---
 apiVersion: v1

@@ -25,3 +25,60 @@ ingress:
   className: alb
   scheme: internet-facing
   targetType: ip
+
+# 리소스 요청/제한(❗HPA가 효과를 보려면 requests가 꼭 있어야 함)
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# web 노드만 쓰도록 (아래 3개는 함께 쓰면 가장 강력)
+nodeSelector:
+  role: "web"
+
+tolerations:
+  - key: "role"
+    operator: "Equal"
+    value: "web"
+    effect: "NoSchedule"
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: "role"
+              operator: In
+              values: ["web"]
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: ["web"]
+          topologyKey: "kubernetes.io/hostname"
+
+# HPA 설정
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
