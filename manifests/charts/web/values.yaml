@@ -2,8 +2,6 @@ image:
   repository: ghcr.io/unklo1200/web-updated
   tag: "latest"
   pullPolicy: IfNotPresent
-  pullSecrets:
-    - ghcr-pull-secret
 
 replicaCount: 2
 
