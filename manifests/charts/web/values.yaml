@@ -1,30 +1,14 @@
+# --- Image ---
 image:
-  repository: ghcr.io/unklo1200/web-updated:lastest
+  repository: ghcr.io/unklo1200/web-updated
   tag: latest
   pullPolicy: IfNotPresent
-  pullSecrets:
-    - ghcr-pull-secret
 
-# Terraform의 argocd-apps에서 privateDomain을 주입합니다.
-privateDomain: "projecteks.local"
+# GHCR pull secret (네임스페이스 web에 존재해야 함: ghcr-cred)
+imagePullSecrets:
+  - name: ghcr-cred
 
-# web 컨테이너가 참조하는 upstream 이름 'was-api'를
-# Route53 프라이빗 도메인으로 연결합니다.
-backend:
-  mode: externalName              # 외부로 강제 연결 (프라이빗 Route53)
-  host: was.projecteks.local      # was 서비스의 프라이빗 도메인 (ExternalDNS가 생성)
-
-service:
-  type: ClusterIP
-  port: 80
-
-ingress:
-  enabled: true
-  className: alb
-  scheme: internet-facing
-  targetType: ip
-
-# 리소스 요청/제한(❗HPA가 효과를 보려면 requests가 꼭 있어야 함)
+# --- Pod resources (HPA가 효과 보려면 requests 필수) ---
 resources:
   requests:
     cpu: "100m"
@@ -33,7 +17,7 @@ resources:
     cpu: "500m"
     memory: "512Mi"
 
-# web 노드만 쓰도록 (아래 3개는 함께 쓰면 가장 강력)
+# --- 스케줄링: web 노드 전용 ---
 nodeSelector:
   role: "web"
 
@@ -43,26 +27,31 @@ tolerations:
     value: "web"
     effect: "NoSchedule"
 
-affinity:
-  nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      nodeSelectorTerms:
-        - matchExpressions:
-            - key: "role"
-              operator: In
-              values: ["web"]
-  podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAffinityTerm:
-          labelSelector:
-            matchExpressions:
-              - key: app
-                operator: In
-                values: ["web"]
-          topologyKey: "kubernetes.io/hostname"
+affinity: {}
 
-# HPA 설정
+# --- 서비스어카운트: 기본값(존재 안해도 안전하게 렌더) ---
+serviceAccount:
+  create: false
+  name: ""   # 빈 값이면 템플릿에서 default 사용
+
+# --- 컨테이너 포트 & 프로브(필요 시 조정) ---
+containerPort: 80
+livenessProbe:
+  enabled: true
+  path: /
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+readinessProbe:
+  enabled: true
+  path: /
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+
+# --- HPA ---
 hpa:
   enabled: true
   minReplicas: 2
@@ -80,3 +69,24 @@ hpa:
         target:
           type: Utilization
           averageUtilization: 70
+
+# --- Ingress (ALB) ---
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: web-group
+  hosts:
+    - host: ""     # 예: soldesk901-1.cloud (원하면 채워 넣기)
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []          # 필요 시 설정
+
+# --- web → was 라우팅(ExternalName 사용 시) ---
+privateDomain: projecteks.local
+backend:
+  mode: externalName  # 'externalName' or 'cluster'
+  host: was.projecteks.local

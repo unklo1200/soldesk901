@@ -3,8 +3,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: was-api
-  namespace: web
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: web
 spec:
   type: ExternalName
-  externalName: {{ .Values.backend.host | quote }}   # e.g., was.projecteks.local
+  externalName: {{ .Values.backend.host | default "was.projecteks.local" }}
 {{- end }}

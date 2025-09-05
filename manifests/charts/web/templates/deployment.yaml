@@ -10,10 +10,6 @@ metadata:
     app.kubernetes.io/version: {{ .Chart.AppVersion }}
     helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
     app: web
-  {{- with .Values.deploymentAnnotations }}
-  annotations:
-{{ toYaml . | indent 4 }}
-  {{- end }}
 spec:
   {{- if not .Values.hpa.enabled }}
   replicas: {{ .Values.replicaCount | default 2 }}
@@ -29,27 +25,19 @@ spec:
       labels:
         app.kubernetes.io/name: web
         app.kubernetes.io/instance: {{ .Release.Name }}
-        app.kubernetes.io/version: {{ .Chart.AppVersion }}
         app: web
-      {{- with .Values.podAnnotations }}
-      annotations:
-{{ toYaml . | indent 8 }}
-      {{- end }}
     spec:
-      {{- if .Values.serviceAccount.create }}
-      serviceAccountName: {{ .Values.serviceAccount.name | default "web-sa" }}
-      {{- else }}
-      serviceAccountName: {{ .Values.serviceAccount.name | default "default" }}
-      {{- end }}
-
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
 {{ toYaml . | indent 8 }}
       {{- end }}
 
-      {{- with .Values.podSecurityContext }}
-      securityContext:
-{{ toYaml . | indent 8 }}
+      # -- serviceAccount nil-safe 처리
+      {{- $sa := (.Values.serviceAccount | default (dict)) }}
+      {{- if and (hasKey $sa "create") ($sa.create) }}
+      serviceAccountName: {{ default "web-sa" $sa.name }}
+      {{- else }}
+      serviceAccountName: {{ default "default" $sa.name }}
       {{- end }}
 
       {{- with .Values.nodeSelector }}
@@ -67,57 +55,13 @@ spec:
 {{ toYaml . | indent 8 }}
       {{- end }}
 
-      {{- with .Values.topologySpreadConstraints }}
-      topologySpreadConstraints:
-{{ toYaml . | indent 8 }}
-      {{- end }}
-
-      nodeSelector:
-        role: "web"
-      tolerations:
-        - key: "role"
-          operator: "Equal"
-          value: "web"
-          effect: "NoSchedule"
-
       containers:
         - name: web
-          image: "{{ .Values.image.repository | default "ghcr.io/unklo1200/web-updated:lastest" }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - name: http
               containerPort: {{ .Values.containerPort | default 80 }}
-
-          {{- if .Values.command }}
-          command:
-{{ toYaml .Values.command | indent 12 }}
-          {{- end }}
-          {{- if .Values.args }}
-          args:
-{{ toYaml .Values.args | indent 12 }}
-          {{- end }}
-
-          {{- if or .Values.env .Values.envFromConfigMaps .Values.envFromSecrets }}
-          env:
-            {{- range $i, $e := (.Values.env | default list) }}
-            - name: {{ $e.name }}
-              value: {{ $e.value | quote }}
-            {{- end }}
-          envFrom:
-            {{- range $cm := (.Values.envFromConfigMaps | default list) }}
-            - configMapRef:
-                name: {{ $cm }}
-            {{- end }}
-            {{- range $sec := (.Values.envFromSecrets | default list) }}
-            - secretRef:
-                name: {{ $sec }}
-            {{- end }}
-          {{- end }}
-
-          {{- with .Values.lifecycle }}
-          lifecycle:
-{{ toYaml . | indent 12 }}
-          {{- end }}
 
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
@@ -145,13 +89,3 @@ spec:
           resources:
 {{ toYaml . | indent 12 }}
           {{- end }}
-
-          {{- with .Values.extraVolumeMounts }}
-          volumeMounts:
-{{ toYaml . | indent 12 }}
-          {{- end }}
-
-      {{- with .Values.extraVolumes }}
-      volumes:
-{{ toYaml . | indent 8 }}
-      {{- end }}

@@ -1,31 +1,25 @@
-apiVersion: v1
-kind: Secret
-metadata:
-  name: was-db-secret
-  namespace: was
-type: Opaque
-data:
-  # base64 인코딩 값입니다. (echo -n '값' | base64)
-  DB_HOST: dGVzdC5jMGZlaXUwNGNyOG8udXMtZWFzdC0xLnJkcy5hbWF6b25hd3MuY29t
-  DB_NAME: dGVzdDI=
-  DB_USER: YXdzbGVhcm5lcg==
-  DB_PASSWORD: YXdzbGVhcm5lcg==   # 'your passwd' (공개 저장소라면 보안상 Secret은 Git에 올리지 않는게 좋습니다)
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: was
   namespace: was
-  labels: { app: was }
+  labels:
+    app: was
 spec:
   replicas: 2
   selector:
-    matchLabels: { app: was }
+    matchLabels:
+      app: was
   template:
     metadata:
-      labels: { app: was }
+      labels:
+        app: was
     spec:
+      # GHCR pull secret
+      imagePullSecrets:
+        - name: ghcr-cred
+
+      # was 전용 노드에만 스케줄
       nodeSelector:
         role: "was"
       tolerations:
@@ -33,30 +27,14 @@ spec:
           operator: "Equal"
           value: "was"
           effect: "NoSchedule"
-      imagePullSecrets:
-        - name: ghcr-pull-secret 
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: "role"
-                    operator: In
-                    values: ["was"]
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app
-                      operator: In
-                      values: ["was"]
-                topologyKey: "kubernetes.io/hostname"
+
       containers:
         - name: was
-          image: ghcr.io/unklo1200/was-updated:lastest
+          image: ghcr.io/unklo1200/was-updated:latest
           imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
           resources:
             requests:
               cpu: "100m"
@@ -64,12 +42,10 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-          envFrom:
-            - secretRef:
-                name: was-db-secret
-          ports:
-            - name: http
-              containerPort: 8000
+          # DB 연결 등 환경이 있으면 여기서 주입
+          # envFrom:
+          #   - secretRef:
+          #       name: was-db-secret
 
 ---
 apiVersion: v1
@@ -77,15 +53,13 @@ kind: Service
 metadata:
   name: was
   namespace: was
-  labels: { app: was }
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
-    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+  labels:
+    app: was
 spec:
-  type: LoadBalancer
-  selector: { app: was }
+  type: ClusterIP
+  selector:
+    app: was
   ports:
     - name: http
       port: 8000
-      targetPort: 8000
+      targetPort: http

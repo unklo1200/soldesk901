@@ -1,51 +1,17 @@
-# --- 1) web 서비스(클러스터 내부)
 apiVersion: v1
 kind: Service
 metadata:
   name: web-svc
-  namespace: web
-  labels: { app: web }
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: web
 spec:
-  type: {{ .Values.service.type }}
-  selector: { app: web }
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: web
   ports:
     - name: http
-      port: {{ .Values.service.port }}
-      targetPort: 80
----
-# --- 2) web 네임스페이스의 was-api(이미지가 참조하는 upstream 이름)
-{{- if eq .Values.backend.mode "externalName" }}
-apiVersion: v1
-kind: Service
-metadata:
-  name: was-api
-  namespace: web
-spec:
-  type: ExternalName
-  externalName: {{ .Values.backend.host | quote }}
-{{- end }}
----
-# --- 3) ALB Ingress (인터넷 앞단)
-{{- if .Values.ingress.enabled }}
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: web-ing
-  namespace: web
-  annotations:
-    alb.ingress.kubernetes.io/scheme: {{ .Values.ingress.scheme | quote }}
-    alb.ingress.kubernetes.io/target-type: {{ .Values.ingress.targetType | quote }}
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-spec:
-  ingressClassName: {{ .Values.ingress.className | quote }}
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: web-svc
-                port:
-                  number: {{ .Values.service.port }}
-{{- end }}
+      port: 80
+      targetPort: http
