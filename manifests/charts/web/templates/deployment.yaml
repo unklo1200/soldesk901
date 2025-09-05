@@ -57,7 +57,10 @@ spec:
 
       containers:
         - name: web
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: ghcr.io/unklo1200/web-updated:latest
+          envFrom:
+            - configMapRef:
+                name: web-config
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - name: http
