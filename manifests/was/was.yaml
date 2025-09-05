@@ -53,7 +53,7 @@ spec:
                 topologyKey: "kubernetes.io/hostname"
       containers:
         - name: was
-          image: ghcr.io/unklo1200/was-api
+          image: ghcr.io/unklo1200/was-updated
           imagePullPolicy: IfNotPresent
           resources:
             requests:

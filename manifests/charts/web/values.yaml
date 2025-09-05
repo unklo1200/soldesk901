@@ -1,7 +1,7 @@
 replicaCount: 2
 
 image:
-  repository: ghcr.io/unklo1200/web_http
+  repository: ghcr.io/unklo1200/web-updated
   tag: latest
   pullPolicy: IfNotPresent
   pullSecrets:
