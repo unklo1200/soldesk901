@@ -1,7 +1,5 @@
-replicaCount: 2
-
 image:
-  repository: ghcr.io/unklo1200/web-updated
+  repository: ghcr.io/unklo1200/web-updated:lastest
   tag: latest
   pullPolicy: IfNotPresent
   pullSecrets:

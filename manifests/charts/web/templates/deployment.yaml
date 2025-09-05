@@ -72,9 +72,17 @@ spec:
 {{ toYaml . | indent 8 }}
       {{- end }}
 
+      nodeSelector:
+        role: "web"
+      tolerations:
+        - key: "role"
+          operator: "Equal"
+          value: "web"
+          effect: "NoSchedule"
+
       containers:
         - name: web
-          image: "{{ .Values.image.repository | default "ghcr.io/unklo1200/web_http" }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository | default "ghcr.io/unklo1200/web-updated:lastest" }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - name: http
