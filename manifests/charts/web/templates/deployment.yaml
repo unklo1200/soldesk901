@@ -26,6 +26,8 @@ spec:
 {{ toYaml . | indent 8 }}
       {{- end }}
     spec:
+      imagePullSecrets:
+        {{- range .Values.image.pullSecrets }}
         - name: {{ . | quote }}
         {{- end }}
       containers:
