@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: appnet
+data:
+  API_HOST: internal-abc123.elb.amazonaws.com
+  API_PORT: "80"
+yaml
+코드 복사
+# deployment.yaml에서 참조
+envFrom:
+  - configMapRef:
+      name: web-config

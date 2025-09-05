@@ -6,10 +6,10 @@ metadata:
 type: Opaque
 data:
   # base64 인코딩 값입니다. (echo -n '값' | base64)
-  DB_HOST: dGVzdC5jbDZrNHk2cXNxaGsuYXAtbm9ydGhlYXN0LTIucmRzLmFtYXpvbmF3cy5jb20=
-  DB_NAME: dGVzdA==
-  DB_USER: YWRtaW4=
-  DB_PASSWORD: YWRtaW5hZG1pbg==   # 'your passwd' (공개 저장소라면 보안상 Secret은 Git에 올리지 않는게 좋습니다)
+  DB_HOST: dGVzdC5jMGZlaXUwNGNyOG8udXMtZWFzdC0xLnJkcy5hbWF6b25hd3MuY29t
+  DB_NAME: dGVzdDI=
+  DB_USER: YXdzbGVhcm5lcg==
+  DB_PASSWORD: YXdzbGVhcm5lcg==   # 'your passwd' (공개 저장소라면 보안상 Secret은 Git에 올리지 않는게 좋습니다)
 
 ---
 apiVersion: apps/v1
