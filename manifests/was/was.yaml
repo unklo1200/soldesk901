@@ -30,7 +30,7 @@ spec:
 
       containers:
         - name: was
-          image: ghcr.io/unklo1200/was-updated:latest
+          image: ghcr.io/unklo1200/was-updated:v10
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

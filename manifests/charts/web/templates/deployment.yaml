@@ -57,7 +57,7 @@ spec:
 
       containers:
         - name: web
-          image: ghcr.io/unklo1200/web-updated:latest
+          image: ghcr.io/unklo1200/web-updated:v11
           envFrom:
             - configMapRef:
                 name: web-config

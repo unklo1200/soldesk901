@@ -1,7 +1,6 @@
 # --- Image ---
 image:
-  repository: ghcr.io/unklo1200/web-updated
-  tag: latest
+  repository: ghcr.io/unklo1200/web-updated:v11
   pullPolicy: IfNotPresent
 
 # GHCR pull secret (네임스페이스 web에 존재해야 함: ghcr-cred)
