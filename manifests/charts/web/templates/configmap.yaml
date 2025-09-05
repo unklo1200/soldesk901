@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: web-config
-  namespace: appnet
+  namespace: web
 data:
   API_HOST: internal-abc123.elb.amazonaws.com
   API_PORT: "80"
