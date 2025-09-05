@@ -12,12 +12,12 @@ spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
   {{- end }}
+  {{- if .Values.ingress.hosts }}
   rules:
-  {{- range .Values.ingress.hosts }}
-    - host: {{ .host | default "" }}
-      http:
+    {{- range .Values.ingress.hosts }}
+    - http:
         paths:
-        {{- range .paths }}
+          {{- range .paths }}
           - path: {{ .path }}
             pathType: {{ .pathType | default "Prefix" }}
             backend:
@@ -25,7 +25,19 @@ spec:
                 name: web-svc
                 port:
                   number: 80
-        {{- end }}
+          {{- end }}
+    {{- end }}
+  {{- else }}
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-svc
+                port:
+                  number: 80
   {{- end }}
   {{- if .Values.ingress.tls }}
   tls:

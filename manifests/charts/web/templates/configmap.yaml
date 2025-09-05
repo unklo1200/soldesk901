@@ -4,8 +4,6 @@ metadata:
   name: web-config
   namespace: web
 data:
-  # Route53 프라이빗 호스트네임(권장) 또는 내부 LB DNS를 넣으세요.
-  # 예) was.projecteks.local  또는  internal-abc123.elb.amazonaws.com
   API_BASE_URL: http://was.projecteks.local:80
   API_HOST: was.projecteks.local
   API_PORT: "80"

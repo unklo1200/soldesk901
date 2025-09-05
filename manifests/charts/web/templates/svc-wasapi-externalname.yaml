@@ -4,9 +4,7 @@ kind: Service
 metadata:
   name: was-api
   namespace: {{ .Release.Namespace }}
-  labels:
-    app: web
 spec:
   type: ExternalName
-  externalName: {{ .Values.backend.host | default "was.projecteks.local" }}
+  externalName: {{ .Values.backend.host | quote }} # was.projecteks.local
 {{- end }}

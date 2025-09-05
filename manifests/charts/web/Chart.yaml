@@ -1,6 +1,6 @@
 apiVersion: v2
 name: web
-description: Web frontend for ProjectEKS (ALB -> web -> Route53 private -> NLB(WAS))
+description: Web frontend for ProjectEKS (public ALB → web)
 type: application
 version: 0.1.0
 appVersion: "1.0.0"

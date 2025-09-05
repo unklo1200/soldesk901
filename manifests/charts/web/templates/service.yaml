@@ -3,15 +3,12 @@ kind: Service
 metadata:
   name: web-svc
   namespace: {{ .Release.Namespace }}
-  labels:
-    app: web
+  labels: { app: web }
 spec:
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: web
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app: web
+  type: {{ .Values.service.type }}
+  selector: { app: web }
   ports:
     - name: http
-      port: 80
-      targetPort: http
+      port: {{ .Values.service.port }}
+      targetPort: 80
+

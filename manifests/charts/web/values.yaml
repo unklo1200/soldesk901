@@ -1,13 +1,15 @@
-# --- Image ---
 image:
-  repository: ghcr.io/unklo1200/web-updated:v11
+  repository: ghcr.io/unklo1200/web-updated
+  tag: "latest"
   pullPolicy: IfNotPresent
+  pullSecrets:
+    - ghcr-pull-secret
 
-# GHCR pull secret (네임스페이스 web에 존재해야 함: ghcr-cred)
-imagePullSecrets:
-  - name: ghcr-cred
+replicaCount: 2
 
-# --- Pod resources (HPA가 효과 보려면 requests 필수) ---
+podAnnotations: {}
+deploymentAnnotations: {}
+
 resources:
   requests:
     cpu: "100m"
@@ -16,41 +18,32 @@ resources:
     cpu: "500m"
     memory: "512Mi"
 
-# --- 스케줄링: web 노드 전용 ---
-nodeSelector:
-  role: "web"
+service:
+  type: ClusterIP
+  port: 80
 
-tolerations:
-  - key: "role"
-    operator: "Equal"
-    value: "web"
-    effect: "NoSchedule"
-
-affinity: {}
-
-# --- 서비스어카운트: 기본값(존재 안해도 안전하게 렌더) ---
-serviceAccount:
-  create: false
-  name: ""   # 빈 값이면 템플릿에서 default 사용
-
-# --- 컨테이너 포트 & 프로브(필요 시 조정) ---
-containerPort: 80
-livenessProbe:
+ingress:
   enabled: true
-  path: /
-  initialDelaySeconds: 10
-  periodSeconds: 10
-  timeoutSeconds: 2
-  failureThreshold: 3
-readinessProbe:
-  enabled: true
-  path: /
-  initialDelaySeconds: 5
-  periodSeconds: 10
-  timeoutSeconds: 2
-  failureThreshold: 3
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/load-balancer-attributes: deletion_protection.enabled=true
+  hosts:
+    - paths:
+        - path: /
+          pathType: Prefix
+  tls: []
 
-# --- HPA ---
+# Terraform에서 주입하는 사설 도메인 (ExternalDNS private HZ)
+privateDomain: "projecteks.local"
+
+# web → was 호출 연결 방식
+backend:
+  mode: externalName
+  host: "was.projecteks.local"
+
 hpa:
   enabled: true
   minReplicas: 2
@@ -69,23 +62,20 @@ hpa:
           type: Utilization
           averageUtilization: 70
 
-# --- Ingress (ALB) ---
-ingress:
-  enabled: true
-  className: alb
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/group.name: web-group
-  hosts:
-    - host: ""     # 예: soldesk901-1.cloud (원하면 채워 넣기)
-      paths:
-        - path: /
-          pathType: Prefix
-  tls: []          # 필요 시 설정
+nodeSelector:
+  role: web
 
-# --- web → was 라우팅(ExternalName 사용 시) ---
-privateDomain: projecteks.local
-backend:
-  mode: externalName  # 'externalName' or 'cluster'
-  host: was.projecteks.local
+tolerations:
+  - key: "role"
+    operator: "Equal"
+    value: "web"
+    effect: "NoSchedule"
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: role
+              operator: In
+              values: ["web"]
