@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: was-db-secret
+  name: was-secret
   namespace: was
   labels:
     app.kubernetes.io/name: was
@@ -16,6 +16,24 @@ stringData:
   DB_USER: "awslearner"
   DB_PASSWORD: "awslearner"
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: was-config
+  namespace: appnet
+data:
+  DB_HOST: "test.c0feiu04cr8o.us-east-1.rds.amazonaws.com"
+  DB_PORT: "3306"
+  DB_DRIVER: "pymysql"
+  DB_CHARSET: "utf8mb4"
+
+  AWS_REGION: "us-east-1"
+  S3_BUCKET: "soldesk-kim"
+  S3_MODE: "presign"
+
+---
+
+
 # 2) WAS Deployment
 apiVersion: apps/v1
 kind: Deployment
