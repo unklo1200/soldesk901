@@ -1,81 +1,15 @@
-image:
-  repository: ghcr.io/unklo1200/web-updated
-  tag: "latest"
-  pullPolicy: IfNotPresent
-  pullSecrets:
-    - ghcr-pull-secret
-
-replicaCount: 2
-
-podAnnotations: {}
-deploymentAnnotations: {}
-
-resources:
-  requests:
-    cpu: "100m"
-    memory: "128Mi"
-  limits:
-    cpu: "500m"
-    memory: "512Mi"
-
-service:
-  type: ClusterIP
-  port: 80
-
-ingress:
-  enabled: true
-  className: alb
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/load-balancer-attributes: deletion_protection.enabled=true
-  hosts:
-    - paths:
-        - path: /
-          pathType: Prefix
-  tls: []
-
-# Terraform에서 주입하는 사설 도메인 (ExternalDNS private HZ)
-privateDomain: "projecteks.local"
-
-# web → was 호출 연결 방식
-backend:
-  mode: externalName
-  host: "was.projecteks.local"
-
-hpa:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 60
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 70
-
-nodeSelector:
-  role: web
-
-tolerations:
-  - key: "role"
-    operator: "Equal"
-    value: "web"
-    effect: "NoSchedule"
-
-affinity:
-  nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      nodeSelectorTerms:
-        - matchExpressions:
-            - key: role
-              operator: In
-              values: ["web"]
+# values.yaml
+# This chart was created by splitting your monolithic YAML into per-resource templates.
+# Everything under templates/ currently preserves your original manifests (no dynamic templating yet).
+# You can gradually parameterize fields (image, replicas, ports, etc.) by replacing
+# literal values with Helm template expressions and referencing keys in this file.
+#
+# Example structure you can adopt later:
+# replicaCount: 1
+# image:
+#   repository: ghcr.io/unklo1200/web-updated
+#   tag: latest
+#   pullPolicy: IfNotPresent
+# service:
+#   type: ClusterIP
+#   port: 80

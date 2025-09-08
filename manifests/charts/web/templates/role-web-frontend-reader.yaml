@@ -1,0 +1,9 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: web-frontend-reader
+  namespace: web
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get","list","watch"]
