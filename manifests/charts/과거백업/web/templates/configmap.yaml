@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: web
+data:
+  API_BASE_URL: http://was.projecteks.local:80
+  API_HOST: was.projecteks.local
+  API_PORT: "80"
