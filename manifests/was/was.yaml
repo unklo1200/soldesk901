@@ -1,21 +1,24 @@
+# =========================================
+# 1) Secret (민감 값)
+# =========================================
 apiVersion: v1
 kind: Secret
 metadata:
-  name: was-secret
-  namespace: was
-  labels:
-    app.kubernetes.io/name: was
-    app.kubernetes.io/component: backend
-    app.kubernetes.io/part-of: projecteks
-    app.kubernetes.io/managed-by: argocd
-    app: was
+  name: was-secrets
+  namespace: appnet
 type: Opaque
 stringData:
-  DB_HOST: "test.c0feiu04cr8o.us-east-1.rds.amazonaws.com"
-  DB_NAME: "test2"
   DB_USER: "awslearner"
-  DB_PASSWORD: "awslearner"
+  DB_PASS: "awslearner"
+  DB_NAME: "test2"
+  # 필요 시 추가
+  # SECRET_KEY: "change-me"
+  # JWT_SECRET: "change-me"
+
 ---
+# =========================================
+# 2) ConfigMap (비민감 값)
+# =========================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -32,72 +35,68 @@ data:
   S3_MODE: "presign"
 
 ---
+# =========================================
+# 3) ServiceAccount (IRSA 연결 시 주석 해제)
+# =========================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: was-api
+  namespace: appnet
+  annotations:
+    # eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/<ROLE_NAME>
 
-
-# 2) WAS Deployment
+---
+# =========================================
+# 4) Deployment (gunicorn /tmp 필요 반영)
+# =========================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: was
-  namespace: was
+  name: was-api
+  namespace: appnet
   labels:
-    app.kubernetes.io/name: was
-    app.kubernetes.io/component: backend
-    app.kubernetes.io/part-of: projecteks
-    app.kubernetes.io/managed-by: argocd
-    app.kubernetes.io/version: "1.0.0"
-    app: was
+    app: was-api
 spec:
-  replicas: 2
+  replicas: 1
   selector:
-    matchLabels: { app: was }
+    matchLabels:
+      app: was-api
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: was
-        app.kubernetes.io/component: backend
-        app.kubernetes.io/part-of: projecteks
-        app.kubernetes.io/managed-by: argocd
-        app: was
+        app: was-api
     spec:
-      imagePullSecrets:
-        - name: ghcr-pull-secret
-      nodeSelector:
-        role: was
-      tolerations:
-        - key: "role"
-          operator: "Equal"
-          value: "was"
-          effect: "NoSchedule"
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: role
-                    operator: In
-                    values: ["was"]
+      serviceAccountName: was-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      volumes:
+        - name: tmp
+          emptyDir: {}                # /tmp writable
       containers:
-        - name: was
-          image: ghcr.io/unklo1200/was-updated:latest
+        - name: was-api
+          image: ghcr.io/unklo1200/was-updated:v10
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8000
+            - name: http
+              containerPort: 8000
           envFrom:
             - secretRef:
-                name: was-db-secret
-          readinessProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /api/health
-              port: 8000
-            initialDelaySeconds: 15
-            periodSeconds: 20
+                name: was-secrets
+            - configMapRef:
+                name: was-config
+          env:
+            - name: HEALTH_DB_CHECK
+              value: "0"
+            - name: TMPDIR
+              value: "/tmp"
+            - name: GUNICORN_CMD_ARGS
+              value: "--worker-tmp-dir /tmp"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: "100m"
@@ -105,27 +104,79 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh","-c","sleep 5"]
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            failureThreshold: 60
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true   # /tmp는 emptyDir로 쓰기 가능
+
 ---
-# 3) WAS NLB(Service) — 내부 NLB로 ExternalDNS가 was.projecteks.local을 생성
+# =========================================
+# 5) 내부 통신용 ClusterIP (DNS: was:8000)
+# =========================================
 apiVersion: v1
 kind: Service
 metadata:
   name: was
-  namespace: was
-  labels:
-    app.kubernetes.io/name: was
-    app.kubernetes.io/component: backend
-    app.kubernetes.io/part-of: projecteks
-    app.kubernetes.io/managed-by: argocd
-    app: was
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
-    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+  namespace: appnet
 spec:
-  type: LoadBalancer
-  selector: { app: was }
+  type: ClusterIP
+  selector:
+    app: was-api
   ports:
     - name: http
       port: 8000
+      targetPort: 8000
+
+---
+# =========================================
+# 6) 내부 NLB (IP 타겟)
+# =========================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: was-api-nlb
+  namespace: appnet
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"               # NLB
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"     # Pod IP 타깃
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"          # 내부 NLB
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "traffic-port"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: "deregistration_delay.timeout_seconds=10"
+    # 필요 시 특정 서브넷 강제:
+    # service.beta.kubernetes.io/aws-load-balancer-subnets: "subnet-aaaa,subnet-bbbb"
+spec:
+  type: LoadBalancer
+  selector:
+    app: was-api
+  ports:
+    - name: http
+      port: 80
       targetPort: 8000
