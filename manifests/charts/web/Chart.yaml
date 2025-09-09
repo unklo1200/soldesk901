@@ -1,5 +1,5 @@
 apiVersion: v2
-name: webapp
+name: web
 description: Auto-split Helm chart generated from webapp.yaml
 type: application
 version: 0.1.0
