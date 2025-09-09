@@ -5,7 +5,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: was-secrets
-  namespace: appnet
+  namespace: was
 type: Opaque
 stringData:
   DB_USER: "awslearner"
@@ -23,7 +23,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: was-config
-  namespace: appnet
+  namespace: was
 data:
   DB_HOST: "test.c0feiu04cr8o.us-east-1.rds.amazonaws.com"
   DB_PORT: "3306"
@@ -42,7 +42,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: was-api
-  namespace: appnet
+  namespace: was
   annotations:
     # eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/<ROLE_NAME>
 
@@ -54,7 +54,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: was-api
-  namespace: appnet
+  namespace: was
   labels:
     app: was-api
 spec:
@@ -84,7 +84,7 @@ spec:
           emptyDir: {}                # /tmp writable
       containers:
         - name: was-api
-          image: ghcr.io/unklo1200/was-updated:v10
+          image: ghcr.io/unklo1200/was-updated:v12
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -149,7 +149,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: was
-  namespace: appnet
+  namespace: was
 spec:
   type: ClusterIP
   selector:
@@ -167,7 +167,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: was-api-nlb
-  namespace: appnet
+  namespace: was
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"               # NLB
     service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"     # Pod IP 타깃
