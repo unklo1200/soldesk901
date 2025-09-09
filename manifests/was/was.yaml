@@ -67,6 +67,13 @@ spec:
       labels:
         app: was-api
     spec:
+      nodeSelector:
+        workload: was
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: was
+          effect: NoSchedule
       serviceAccountName: was-api
       securityContext:
         runAsNonRoot: true
