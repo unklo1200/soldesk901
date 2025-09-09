@@ -1,15 +1,8 @@
-# values.yaml
-# This chart was created by splitting your monolithic YAML into per-resource templates.
-# Everything under templates/ currently preserves your original manifests (no dynamic templating yet).
-# You can gradually parameterize fields (image, replicas, ports, etc.) by replacing
-# literal values with Helm template expressions and referencing keys in this file.
-#
-# Example structure you can adopt later:
-# replicaCount: 1
-# image:
-#   repository: ghcr.io/unklo1200/web-updated
-#   tag: latest
-#   pullPolicy: IfNotPresent
-# service:
-#   type: ClusterIP
-#   port: 80
+nodeSelector:
+  workload: web
+
+tolerations:
+  - key: dedicated
+    operator: Equal
+    value: web
+    effect: NoSchedule
