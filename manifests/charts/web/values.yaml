@@ -6,3 +6,28 @@ tolerations:
     operator: Equal
     value: web
     effect: NoSchedule
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-alb
+  namespace: web
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    # 도메인 쓰면(ExternalDNS) 이 라인도 선택:
+    # external-dns.alpha.kubernetes.io/hostname: your-domain.example.com
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-frontend
+            port:
+              number: 80
