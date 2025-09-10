@@ -1,19 +1,45 @@
-nodeSelector:
-  workload: web
-tolerations:
-- key: dedicated
-  operator: Equal
-  value: web
-  effect: NoSchedule
-imagePullSecrets:
-- name: ghcr-creds
+# --- web/values.yaml (clean) ---
+image:
+  repository: ghcr.io/unklo1200/web-updated
+  tag: "v16"
+  pullPolicy: IfNotPresent
+  pullSecrets:
+    - ghcr-pull-secret   # <-- Terraform이 만든 secret 이름과 일치
+
+service:
+  type: ClusterIP
+  port: 80
+
 ingress:
   enabled: true
-  serviceName: web-frontend
-  servicePort: 80
+  className: alb
   annotations:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /
+  hosts:
+    - paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: web-frontend
+              port:
+                number: 80
+
+nodeSelector:
+  workload: web
+
+tolerations:
+  - key: "role"
+    operator: "Equal"
+    value: "web"
+    effect: "NoSchedule"
+
+resources: {}
+
+backend:
+  mode: externalName
+  host: "was.projecteks.local"  # external-dns(private)로 관리되는 내부 FQDN 가정
