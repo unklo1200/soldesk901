@@ -84,7 +84,7 @@ spec:
           emptyDir: {}                # /tmp writable
       containers:
         - name: was-api
-          image: ghcr.io/unklo1200/was-updated:v12
+          image: ghcr.io/unklo1200/was-updated:v10
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
