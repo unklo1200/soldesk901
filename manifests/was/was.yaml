@@ -10,7 +10,7 @@ type: Opaque
 stringData:
   DB_USER: "awslearner"
   DB_PASS: "awslearner"
-  DB_NAME: "test2"
+  DB_NAME: "project"
   # 필요 시 추가
   # SECRET_KEY: "change-me"
   # JWT_SECRET: "change-me"
@@ -25,7 +25,7 @@ metadata:
   name: was-config
   namespace: was
 data:
-  DB_HOST: "test.c0feiu04cr8o.us-east-1.rds.amazonaws.com"
+  DB_HOST: "projectrds.c0feiu04cr8o.us-east-1.rds.amazonaws.com"
   DB_PORT: "3306"
   DB_DRIVER: "pymysql"
   DB_CHARSET: "utf8mb4"
