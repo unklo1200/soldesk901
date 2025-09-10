@@ -25,3 +25,15 @@ resources: {}
 backend:
   mode: externalName
   host: "was.projecteks.local"  # external-dns(private)로 관리되는 내부 FQDN 가정
+
+ingress:
+  enabled: false
+  className: alb
+  annotations: {}
+  hosts:
+    - host: web.projecteks.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
