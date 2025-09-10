@@ -6,7 +6,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: web-frontend
-    namespace: appnet
+    namespace: web
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

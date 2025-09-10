@@ -1,16 +1,12 @@
 nodeSelector:
   workload: web
-
 tolerations:
-  - key: dedicated
-    operator: Equal
-    value: web
-    effect: NoSchedule
-
-# 프라이빗 GHCR 쓰면 권장
+- key: dedicated
+  operator: Equal
+  value: web
+  effect: NoSchedule
 imagePullSecrets:
-  - name: ghcr-creds
-
+- name: ghcr-creds
 ingress:
   enabled: true
   serviceName: web-frontend
