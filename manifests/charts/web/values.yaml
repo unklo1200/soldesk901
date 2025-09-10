@@ -11,9 +11,10 @@ imagePullSecrets:
 containerPort: 8080         # ★ 앱이 실제로 여는 포트
 
 backend:
-  host: was.projecteks.local
-  port: 8000
   protocol: http
+  host: was-api.was.svc.cluster.local
+  port: 8000
+
 
 # 스케줄링: web 노드 전용
 nodeSelector:
