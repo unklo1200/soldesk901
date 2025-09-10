@@ -7,27 +7,17 @@ tolerations:
     value: web
     effect: NoSchedule
 
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: web-alb
-  namespace: web
+# 프라이빗 GHCR 쓰면 권장
+imagePullSecrets:
+  - name: ghcr-creds
+
+ingress:
+  enabled: true
+  serviceName: web-frontend
+  servicePort: 80
   annotations:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /
-    # 도메인 쓰면(ExternalDNS) 이 라인도 선택:
-    # external-dns.alpha.kubernetes.io/hostname: your-domain.example.com
-spec:
-  rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: web-frontend
-            port:
-              number: 80
