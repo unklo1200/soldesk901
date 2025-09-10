@@ -1,18 +1,23 @@
-# --- web/values.yaml (clean) ---
+replicaCount: 2
+
 image:
   repository: ghcr.io/unklo1200/web-updated
-  tag: "v16"
+  tag: "v16"               # helm template 출력에 맞춤 (원하면 latest로 변경 가능)
   pullPolicy: IfNotPresent
 
 imagePullSecrets:
-  - name: ghcr-pull-secret   # 네임스페이스(web)에 존재해야 함
+  - name: ghcr-pull-secret  # web 네임스페이스에 존재해야 함
 
-service:
-  type: ClusterIP
-  port: 80
+containerPort: 8080         # ★ 앱이 실제로 여는 포트
 
+backend:
+  host: was.projecteks.local
+  port: 8000
+  protocol: http
+
+# 스케줄링: web 노드 전용
 nodeSelector:
-  workload: "web"
+  workload: web
 
 tolerations:
   - key: "dedicated"
@@ -20,13 +25,21 @@ tolerations:
     value: "web"
     effect: "NoSchedule"
 
-affinity: {}
-resources: {}
+# 프로브가 포트 'http' 이름을 쓰도록(템플릿과 맞물림)
+probes:
+  path: /
+  portName: http
 
-backend:
-  mode: externalName
-  host: "was.projecteks.local"  # external-dns(private)로 관리되는 내부 FQDN 가정
+# HPA가 쓰기 위한 최소 requests (없으면 메트릭 퍼센트 계산 불가)
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
 
+# Ingress는 일단 비활성(나중에 켜면 됨)
 ingress:
   enabled: false
   className: alb
@@ -37,4 +50,3 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []
-
