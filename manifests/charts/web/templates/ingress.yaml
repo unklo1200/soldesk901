@@ -9,14 +9,17 @@ metadata:
     {{ $k }}: {{ $v | quote }}
     {{- end }}
 spec:
+  ingressClassName: {{ .Values.ingress.className | quote }}
   rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: {{ .Values.ingress.serviceName | default "web-frontend" }}
-            port:
-              number: {{ .Values.ingress.servicePort | default 80 }}
+    - host: {{ (index .Values.ingress.hosts 0).host | quote }}   # 또는 range .Values.ingress.hosts
+      http:
+        paths:
+          - path: {{ (index .Values.ingress.hosts 0).paths 0).path | default "/" }}
+            pathType: {{ (index .Values.ingress.hosts 0).paths 0).pathType | default "Prefix" }}
+            backend:
+              service:
+                name: web-frontend
+                port:
+                  number: 80
 {{- end }}
+
