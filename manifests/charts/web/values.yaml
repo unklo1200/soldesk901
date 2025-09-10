@@ -12,14 +12,15 @@ service:
   port: 80
 
 nodeSelector:
-  workload: web
+  eks.amazonaws.com/nodegroup: web
 
 tolerations:
-  - key: "role"
+  - key: "dedicated"
     operator: "Equal"
     value: "web"
     effect: "NoSchedule"
 
+affinity: {}
 resources: {}
 
 backend:
