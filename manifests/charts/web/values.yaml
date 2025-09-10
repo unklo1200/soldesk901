@@ -3,31 +3,13 @@ image:
   repository: ghcr.io/unklo1200/web-updated
   tag: "v16"
   pullPolicy: IfNotPresent
-  pullSecrets:
-    - ghcr-pull-secret   # <-- Terraform이 만든 secret 이름과 일치
+
+imagePullSecrets:
+  - name: ghcr-pull-secret   # 네임스페이스(web)에 존재해야 함
 
 service:
   type: ClusterIP
   port: 80
-
-ingress:
-  enabled: true
-  className: alb
-  annotations:
-    kubernetes.io/ingress.class: alb
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-    alb.ingress.kubernetes.io/healthcheck-path: /
-  hosts:
-    - paths:
-        - path: /
-          pathType: Prefix
-          backend:
-            service:
-              name: web-frontend
-              port:
-                number: 80
 
 nodeSelector:
   workload: web
