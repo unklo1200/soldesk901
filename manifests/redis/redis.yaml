@@ -10,7 +10,7 @@ metadata:
   namespace: redis
 type: Opaque
 stringData:
-  REDIS_PASSWORD: "changeme-please"  # TODO: replace in CI/TF with a strong value
+  redis-password: "changeme-please"  # TODO: replace in CI/TF with a strong value
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -35,17 +35,17 @@ spec:
             - containerPort: 6379
               name: redis
           env:
-            - name: REDIS_PASSWORD
+            - name: redis-password
               valueFrom:
                 secretKeyRef:
                   name: redis-auth
-                  key: REDIS_PASSWORD
+                  key: redis-password
           command: ["redis-server"]
           args:
             - "--appendonly"
             - "yes"
             - "--requirepass"
-            - "$(REDIS_PASSWORD)"
+            - "$(redis-password)"
           volumeMounts:
             - name: data
               mountPath: /data

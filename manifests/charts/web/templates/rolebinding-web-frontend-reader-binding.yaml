@@ -2,11 +2,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: web-frontend-reader-binding
-  namespace: web
+  namespace: {{ .Release.Namespace }}
 subjects:
   - kind: ServiceAccount
     name: web-frontend
-    namespace: web
+    namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

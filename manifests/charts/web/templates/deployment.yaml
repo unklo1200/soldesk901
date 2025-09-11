@@ -1,142 +1,141 @@
-\
-        apiVersion: apps/v1
-        kind: Deployment
-        metadata:
-          name: web-deploy
-          namespace: {{ .Release.Namespace }}
-          labels:
-            app: web
-        spec:
-          replicas: {{ .Values.replicaCount | default 1 }}
-          selector:
-            matchLabels:
-              app: web
-          template:
-            metadata:
-              labels:
-                app: web
-            spec:
-              serviceAccountName: web-frontend
-              imagePullSecrets:
-        {{- range .Values.imagePullSecrets }}
-                - name: {{ .name }}
-        {{- end }}
-              volumes:
-                - name: web-shared
-                  emptyDir: {}
-        {{- if and .Values.sidecar.envoy.enabled (eq .Values.mode "envoy") }}
-                - name: envoy-config
-                  configMap:
-                    name: web-envoy
-        {{- end }}
-              containers:
-                - name: web
-                  image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-                  imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
-                  ports:
-                    - name: http
-                      containerPort: {{ .Values.containerPort }}
-                  env:
-        {{- if eq .Values.mode "envoy" }}
-                    - name: API_BASE
-                      value: "http://127.0.0.1:{{ .Values.sidecar.envoy.port }}"
-        {{- else }}
-                    - name: API_BASE_FILE
-                      value: "/opt/web-shared/api_base"
-        {{- end }}
-        {{- if .Values.redis.enabled }}
-                    - name: REDIS_HOST
-                      value: "{{ .Values.redis.host }}"
-                    - name: REDIS_PORT
-                      value: "{{ .Values.redis.port }}"
-                    - name: REDIS_PASSWORD
-                      valueFrom:
-                        secretKeyRef:
-                          name: {{ .Values.redis.secretName }}
-                          key: {{ .Values.redis.secretKey }}
-        {{- end }}
-                  volumeMounts:
-                    - name: web-shared
-                      mountPath: /opt/web-shared
-                  readinessProbe:
-                    httpGet:
-                      path: /
-                      port: {{ .Values.containerPort }}
-                    initialDelaySeconds: 10
-                    periodSeconds: 10
-                  livenessProbe:
-                    httpGet:
-                      path: /
-                      port: {{ .Values.containerPort }}
-                    initialDelaySeconds: 30
-                    periodSeconds: 30
-                  resources:
-        {{ toYaml .Values.resources | nindent 20 }}
-        {{- if and .Values.sidecar.envoy.enabled (eq .Values.mode "envoy") }}
-                - name: envoy
-                  image: "{{ .Values.sidecar.envoy.image }}"
-                  args:
-                    - "-c"
-                    - "/etc/envoy/envoy.yaml"
-                  command: ["envoy"]
-                  ports:
-                    - name: envoy
-                      containerPort: {{ .Values.sidecar.envoy.port }}
-                    - name: envoy-admin
-                      containerPort: {{ .Values.sidecar.envoy.adminPort }}
-                  volumeMounts:
-                    - name: envoy-config
-                      mountPath: /etc/envoy
-                  readinessProbe:
-                    httpGet:
-                      path: /ready
-                      port: {{ .Values.sidecar.envoy.adminPort }}
-                    initialDelaySeconds: 5
-                    periodSeconds: 10
-                  livenessProbe:
-                    httpGet:
-                      path: /server_info
-                      port: {{ .Values.sidecar.envoy.adminPort }}
-                    initialDelaySeconds: 15
-                    periodSeconds: 20
-        {{- end }}
-        {{- if and .Values.nlbWatcher.enabled (eq .Values.mode "direct") }}
-                - name: nlb-watcher
-                  image: "{{ .Values.nlbWatcher.image }}"
-                  imagePullPolicy: IfNotPresent
-                  env:
-                    - name: NAMESPACE
-                      value: "{{ .Values.nlbWatcher.targetServiceNamespace }}"
-                    - name: SVC_NAME
-                      value: "{{ .Values.nlbWatcher.targetServiceName }}"
-                    - name: OUT_FILE
-                      value: "{{ .Values.nlbWatcher.outFile }}"
-                    - name: TARGET_PORT
-                      value: "{{ .Values.nlbWatcher.targetPort }}"
-                  command: ["/bin/sh","-c"]
-                  args:
-                    - >
-                      echo "Starting NLB watcher...";
-                      while true; do
-                        DNS=$(kubectl get svc ${SVC_NAME} -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true);
-                        if [ -n "$DNS" ]; then
-                          echo "http://$DNS:${TARGET_PORT}" > ${OUT_FILE};
-                        fi;
-                        sleep {{ .Values.nlbWatcher.pollInterval }};
-                      done
-                  volumeMounts:
-                    - name: web-shared
-                      mountPath: /opt/web-shared
-        {{- end }}
-              {{- with .Values.nodeSelector }}
-              nodeSelector:
-        {{ toYaml . | nindent 16 }}
-              {{- end }}
-              {{- with .Values.affinity }}
-              affinity:
-        {{ toYaml . | nindent 16 }}
-              {{- end }}
-              {{- with .Values.tolerations }}
-              tolerations:
-        {{ toYaml . | nindent 16 }}
-              {{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deploy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: web
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      serviceAccountName: web-frontend
+      imagePullSecrets:
+{{- range .Values.imagePullSecrets }}
+        - name: {{ .name }}
+{{- end }}
+      volumes:
+        - name: web-shared
+          emptyDir: {}
+{{- if and .Values.sidecar.envoy.enabled (eq .Values.mode "envoy") }}
+        - name: envoy-config
+          configMap:
+            name: web-envoy
+{{- end }}
+      containers:
+        - name: web
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+          env:
+{{- if eq .Values.mode "envoy" }}
+            - name: API_BASE
+              value: "http://127.0.0.1:{{ .Values.sidecar.envoy.port }}"
+{{- else }}
+            - name: API_BASE_FILE
+              value: "/opt/web-shared/api_base"
+{{- end }}
+{{- if .Values.redis.enabled }}
+            - name: REDIS_HOST
+              value: "{{ .Values.redis.host }}"
+            - name: REDIS_PORT
+              value: "{{ .Values.redis.port }}"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.secretName }}
+                  key: {{ .Values.redis.secretKey }}
+{{- end }}
+          volumeMounts:
+            - name: web-shared
+              mountPath: /opt/web-shared
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.containerPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.containerPort }}
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+{{ toYaml .Values.resources | nindent 20 }}
+{{- if and .Values.sidecar.envoy.enabled (eq .Values.mode "envoy") }}
+        - name: envoy
+          image: "{{ .Values.sidecar.envoy.image }}"
+          args:
+            - "-c"
+            - "/etc/envoy/envoy.yaml"
+          command: ["envoy"]
+          ports:
+            - name: envoy
+              containerPort: {{ .Values.sidecar.envoy.port }}
+            - name: envoy-admin
+              containerPort: {{ .Values.sidecar.envoy.adminPort }}
+          volumeMounts:
+            - name: envoy-config
+              mountPath: /etc/envoy
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{ .Values.sidecar.envoy.adminPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /server_info
+              port: {{ .Values.sidecar.envoy.adminPort }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+{{- end }}
+{{- if and .Values.nlbWatcher.enabled (eq .Values.mode "direct") }}
+        - name: nlb-watcher
+          image: "{{ .Values.nlbWatcher.image }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NAMESPACE
+              value: "{{ .Values.nlbWatcher.targetServiceNamespace }}"
+            - name: SVC_NAME
+              value: "{{ .Values.nlbWatcher.targetServiceName }}"
+            - name: OUT_FILE
+              value: "{{ .Values.nlbWatcher.outFile }}"
+            - name: TARGET_PORT
+              value: "{{ .Values.nlbWatcher.targetPort }}"
+          command: ["/bin/sh","-c"]
+          args:
+            - >
+              echo "Starting NLB watcher...";
+              while true; do
+                DNS=$(kubectl get svc ${SVC_NAME} -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true);
+                if [ -n "$DNS" ]; then
+                  echo "http://$DNS:${TARGET_PORT}" > ${OUT_FILE};
+                fi;
+                sleep {{ .Values.nlbWatcher.pollInterval }};
+              done
+          volumeMounts:
+            - name: web-shared
+              mountPath: /opt/web-shared
+{{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | nindent 16 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | nindent 16 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | nindent 16 }}
+      {{- end }}
