@@ -32,9 +32,8 @@ ingress:
   className: alb
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
-    external-dns.alpha.kubernetes.io/hostname: soldesk901-1.cloud
   hosts:
-  - host: soldesk901-1.cloud
+  - host: web.projecteks.local
     paths:
     - path: /
       pathType: Prefix

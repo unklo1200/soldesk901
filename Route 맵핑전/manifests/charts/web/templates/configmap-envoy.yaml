@@ -1,0 +1,51 @@
+{{- if and .Values.sidecar.envoy.enabled (eq .Values.mode "envoy") }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-envoy
+  namespace: {{ .Release.Namespace }}
+data:
+  envoy.yaml: |
+    static_resources:
+      listeners:
+        - name: http_listener
+          address:
+            socket_address:
+              address: 0.0.0.0
+              port_value: {{ .Values.sidecar.envoy.port }}
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: ingress_http
+                    route_config:
+                      name: local_route
+                      virtual_hosts:
+                        - name: service
+                          domains: ["*"]
+                          routes:
+                            - match: { prefix: "/" }
+                              route: { cluster: was_upstream }
+                    http_filters:
+                      - name: envoy.filters.http.router
+      clusters:
+        - name: was_upstream
+          type: STRICT_DNS
+          connect_timeout: 1s
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: was_upstream
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Values.sidecar.envoy.upstreamHost | default "example.com" }}
+                          port_value: {{ .Values.sidecar.envoy.upstreamPort | default 80 }}
+    admin:
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: {{ .Values.sidecar.envoy.adminPort }}
+{{- end }}
