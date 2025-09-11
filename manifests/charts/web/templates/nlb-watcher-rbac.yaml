@@ -1,0 +1,23 @@
+{{- if and .Values.nlbWatcher.enabled (eq .Values.mode "direct") }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: web-nlb-service-reader
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: web-nlb-service-reader-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: web-nlb-service-reader
+subjects:
+  - kind: ServiceAccount
+    name: web-frontend
+    namespace: {{ .Release.Namespace }}
+{{- end }}

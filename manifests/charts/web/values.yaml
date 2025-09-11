@@ -50,3 +50,25 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []
+
+
+# === Sidecar mode (default: direct) ===
+mode: "direct"   # direct = nlb-watcher; envoy = local proxy 127.0.0.1
+
+
+nlbWatcher:
+  enabled: true
+  image: "bitnami/kubectl:latest"
+  pollInterval: 20
+  targetServiceNamespace: "was"
+  targetServiceName: "was-svc"
+  targetPort: 80
+  outFile: "/opt/web-shared/api_base"
+
+
+redis:
+  enabled: true
+  host: "redis-master.redis.svc.cluster.local"
+  port: 6379
+  secretName: "redis-auth"
+  secretKey: "redis-password"
