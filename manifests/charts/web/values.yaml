@@ -1,74 +1,54 @@
 replicaCount: 2
-
 image:
   repository: ghcr.io/unklo1200/web-updated
-  tag: "v16"               # helm template 출력에 맞춤 (원하면 latest로 변경 가능)
+  tag: v16
   pullPolicy: IfNotPresent
-
 imagePullSecrets:
-  - name: ghcr-pull-secret  # web 네임스페이스에 존재해야 함
-
-containerPort: 8080         # ★ 앱이 실제로 여는 포트
-
+- name: ghcr-pull-secret
+containerPort: 8080
 backend:
   protocol: http
   host: was.projecteks.local
   port: 8000
-
-# 스케줄링: web 노드 전용
 nodeSelector:
   workload: web
-
 tolerations:
-  - key: "dedicated"
-    operator: "Equal"
-    value: "web"
-    effect: "NoSchedule"
-
-# 프로브가 포트 'http' 이름을 쓰도록(템플릿과 맞물림)
+- key: dedicated
+  operator: Equal
+  value: web
+  effect: NoSchedule
 probes:
   path: /
   portName: http
-
-# HPA가 쓰기 위한 최소 requests (없으면 메트릭 퍼센트 계산 불가)
 resources:
   requests:
-    cpu: "100m"
-    memory: "128Mi"
+    cpu: 100m
+    memory: 128Mi
   limits:
-    cpu: "500m"
-    memory: "256Mi"
-
-# Ingress는 일단 비활성(나중에 켜면 됨)
+    cpu: 500m
+    memory: 256Mi
 ingress:
   enabled: false
   className: alb
   annotations: {}
   hosts:
-    - host: web.projecteks.local
-      paths:
-        - path: /
-          pathType: Prefix
+  - host: web.projecteks.local
+    paths:
+    - path: /
+      pathType: Prefix
   tls: []
-
-
-# === Sidecar mode (default: direct) ===
-mode: "direct"   # direct = nlb-watcher; envoy = local proxy 127.0.0.1
-
-
+mode: direct
 nlbWatcher:
   enabled: true
-  image: "bitnami/kubectl:latest"
+  image: bitnami/kubectl:latest
   pollInterval: 20
-  targetServiceNamespace: "was"
-  targetServiceName: "was-svc"
+  targetServiceNamespace: was
+  targetServiceName: was-api-nlb
   targetPort: 80
-  outFile: "/opt/web-shared/api_base"
-
-
+  outFile: /opt/web-shared/api_base
 redis:
   enabled: true
-  host: "redis-master.redis.svc.cluster.local"
+  host: redis.redis.svc.cluster.local
   port: 6379
-  secretName: "redis-auth"
-  secretKey: "redis-password"
+  secretName: redis-auth
+  secretKey: redis-password
