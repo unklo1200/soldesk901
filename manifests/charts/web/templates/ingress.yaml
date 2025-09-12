@@ -3,7 +3,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: web-alb
-  namespace: {{ .Release.Namespace }}
+  namespace: web
   annotations:
     {{- range $k, $v := .Values.ingress.annotations }}
     {{ $k }}: {{ $v | quote }}
@@ -11,18 +11,15 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.className | quote }}
   rules:
-    {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+    - host: {{ (index .Values.ingress.hosts 0).host | quote }}   # 또는 range .Values.ingress.hosts
       http:
         paths:
-          {{- range .paths }}
-          - path: {{ .path | default "/" }}
-            pathType: {{ .pathType | default "Prefix" }}
+          - path: {{ (index .Values.ingress.hosts 0).paths 0).path | default "/" }}
+            pathType: {{ (index .Values.ingress.hosts 0).paths 0).pathType | default "Prefix" }}
             backend:
               service:
                 name: web-frontend
                 port:
                   number: 80
-          {{- end }}
-    {{- end }}
 {{- end }}
+
