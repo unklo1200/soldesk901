@@ -28,15 +28,16 @@ resources:
     cpu: 500m
     memory: 256Mi
 ingress:
-
   className: alb
-  annotations: {}
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: soldesk901-1.cloud
   hosts:
   - host: soldesk901-1.cloud
     paths:
     - path: /
       pathType: Prefix
   tls: []
+  enabled: true
 mode: direct
 nlbWatcher:
   enabled: true
