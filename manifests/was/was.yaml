@@ -64,7 +64,7 @@ spec:
         emptyDir: {}
       containers:
       - name: was-api
-        image: ghcr.io/unklo1200/was-updated:latest
+        image: ghcr.io/unklo1200/was-updated:v12
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
