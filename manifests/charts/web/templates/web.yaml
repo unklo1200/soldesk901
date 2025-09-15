@@ -1,0 +1,311 @@
+{{- /* ===== SAFE HELPERS ===== */ -}}
+{{- $vals := .Values -}}
+{{- $mode := default "direct" (get $vals "mode") -}}
+{{- /* sidecar/envoy 안전 가드 */ -}}
+{{- $hasSidecar := and (hasKey $vals "sidecar") (kindIs "map" (get $vals "sidecar")) -}}
+{{- $sidecar := ternary (get $vals "sidecar") (dict) $hasSidecar -}}
+{{- $hasEnvoy := and $hasSidecar (hasKey $sidecar "envoy") (kindIs "map" (get $sidecar "envoy")) -}}
+{{- $envoy := ternary (get $sidecar "envoy") (dict) $hasEnvoy -}}
+{{- $envoyEnabled := default false (get $envoy "enabled") -}}
+{{- $envoyPort := default 15000 (get $envoy "port") -}}
+{{- $envoyAdmin := default 19000 (get $envoy "adminPort") -}}
+{{- $envoyImage := default "envoyproxy/envoy:v1.30-latest" (get $envoy "image") -}}
+{{- $envoyUpHost := default "example.com" (get $envoy "upstreamHost") -}}
+{{- $envoyUpPort := default 80 (get $envoy "upstreamPort") -}}
+{{- /* nlbWatcher 안전 가드 */ -}}
+{{- $hasNlb := and (hasKey $vals "nlbWatcher") (kindIs "map" (get $vals "nlbWatcher")) -}}
+{{- $nlb := ternary (get $vals "nlbWatcher") (dict) $hasNlb -}}
+{{- $nlbEnabled := default false (get $nlb "enabled") -}}
+{{- $nlbNS := default "was" (get $nlb "targetServiceNamespace") -}}
+{{- $nlbSVC := default "was-api-nlb" (get $nlb "targetServiceName") -}}
+{{- $nlbOut := default "/opt/web-shared/api_base" (get $nlb "outFile") -}}
+{{- $nlbImg := default "bitnami/kubectl:latest" (get $nlb "image") -}}
+{{- $nlbPoll := default 20 (get $nlb "pollInterval") -}}
+{{- $nlbPort := default 80 (get $nlb "targetPort") -}}
+{{- /* redis 안전 가드 */ -}}
+{{- $hasRedis := and (hasKey $vals "redis") (kindIs "map" (get $vals "redis")) -}}
+{{- $redis := ternary (get $vals "redis") (dict) $hasRedis -}}
+{{- $redisEnabled := default false (get $redis "enabled") -}}
+{{- /* ingress 안전 가드 */ -}}
+{{- $hasIng := and (hasKey $vals "ingress") (kindIs "map" (get $vals "ingress")) -}}
+{{- $ing := ternary (get $vals "ingress") (dict) $hasIng -}}
+{{- $ingEnabled := default false (get $ing "enabled") -}}
+{{- $ingClass := get $ing "className" -}}
+{{- $ingAnn := get $ing "annotations" -}}
+{{- $ingHosts := default (list) (get $ing "hosts") -}}
+{{- /* ===== Envoy ConfigMap (envoy 모드 + enabled) ===== */ -}}
+{{- if and (eq $mode "envoy") $envoyEnabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-envoy
+  namespace: {{ .Release.Namespace }}
+data:
+  envoy.yaml: |
+    static_resources:
+      listeners:
+        - name: http_listener
+          address:
+            socket_address:
+              address: 0.0.0.0
+              port_value: {{ $envoyPort }}
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: ingress_http
+                    route_config:
+                      name: local_route
+                      virtual_hosts:
+                        - name: service
+                          domains: ["*"]
+                          routes:
+                            - match: { prefix: "/" }
+                              route: { cluster: was_upstream }
+                    http_filters:
+                      - name: envoy.filters.http.router
+      clusters:
+        - name: was_upstream
+          type: STRICT_DNS
+          connect_timeout: 1s
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: was_upstream
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ $envoyUpHost }}
+                          port_value: {{ $envoyUpPort }}
+    admin:
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: {{ $envoyAdmin }}
+---
+{{- end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: web-frontend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+{{- /* direct 모드 + watcher enabled → 다른 NS의 Service 읽어야 해서 ClusterRole 필요 */ -}}
+{{- if and (eq $mode "direct") $nlbEnabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: web-nlb-service-reader
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get","list","watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: web-nlb-service-reader-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: web-nlb-service-reader
+subjects:
+  - kind: ServiceAccount
+    name: web-frontend
+    namespace: {{ .Release.Namespace }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deploy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: web
+spec:
+  replicas: {{ default 1 (get $vals "replicaCount") }}
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+      {{- with (get $vals "podAnnotations") }}
+      annotations:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: web-frontend
+      {{- with (get $vals "imagePullSecrets") }}
+      imagePullSecrets:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: web-shared
+          emptyDir: {}
+      {{- if and (eq $mode "envoy") $envoyEnabled }}
+        - name: envoy-config
+          configMap:
+            name: web-envoy
+      {{- end }}
+      containers:
+        - name: web
+          image: "{{ (get $vals "image").repository }}:{{ (get $vals "image").tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ (get $vals "image").pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ default 80 (get $vals "containerPort") }}
+              protocol: TCP
+          env:
+          {{- if eq $mode "envoy" }}
+            - name: API_BASE
+              value: "http://127.0.0.1:{{ $envoyPort }}"
+          {{- else }}
+            - name: API_BASE_FILE
+              value: "/opt/web-shared/api_base"
+          {{- end }}
+          {{- if $redisEnabled }}
+            - name: REDIS_HOST
+              value: "{{ default "" (get $redis "host") }}"
+            - name: REDIS_PORT
+              value: "{{ default 6379 (get $redis "port") }}"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default "redis-auth" (get $redis "secretName") }}
+                  key: {{ default "REDIS_PASSWORD" (get $redis "secretKey") }}
+          {{- end }}
+          volumeMounts:
+            - name: web-shared
+              mountPath: /opt/web-shared
+          readinessProbe:
+            httpGet:
+              path: {{ default "/" (get (get $vals "probes") "path") }}
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: {{ default "/" (get (get $vals "probes") "path") }}
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+{{ toYaml (get $vals "resources") | nindent 12 }}
+        {{- if and (eq $mode "envoy") $envoyEnabled }}
+        - name: envoy
+          image: "{{ $envoyImage }}"
+          args: ["-c","/etc/envoy/envoy.yaml"]
+          command: ["envoy"]
+          ports:
+            - name: envoy
+              containerPort: {{ $envoyPort }}
+            - name: envoy-admin
+              containerPort: {{ $envoyAdmin }}
+          volumeMounts:
+            - name: envoy-config
+              mountPath: /etc/envoy
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{ $envoyAdmin }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /server_info
+              port: {{ $envoyAdmin }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+        {{- end }}
+        {{- if and (eq $mode "direct") $nlbEnabled }}
+        - name: nlb-watcher
+          image: "{{ $nlbImg }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NAMESPACE
+              value: "{{ $nlbNS }}"
+            - name: SVC_NAME
+              value: "{{ $nlbSVC }}"
+            - name: OUT_FILE
+              value: "{{ $nlbOut }}"
+            - name: TARGET_PORT
+              value: "{{ $nlbPort }}"
+          command: ["/bin/sh","-c"]
+          args:
+            - >
+              echo "Starting NLB watcher...";
+              while true; do
+                DNS=$(kubectl get svc ${SVC_NAME} -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true);
+                if [ -n "$DNS" ]; then
+                  echo "http://$DNS:${TARGET_PORT}" > ${OUT_FILE};
+                fi;
+                sleep {{ $nlbPoll }};
+              done
+          volumeMounts:
+            - name: web-shared
+              mountPath: /opt/web-shared
+        {{- end }}
+      {{- with (get $vals "nodeSelector") }}
+      nodeSelector:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (get $vals "affinity") }}
+      affinity:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (get $vals "tolerations") }}
+      tolerations:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-frontend
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: web
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+{{- if $ingEnabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-alb
+  namespace: {{ .Release.Namespace }}
+  {{- with $ingAnn }}
+  annotations:
+{{ toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $ingClass }}
+  ingressClassName: {{ $ingClass | quote }}
+  {{- end }}
+  rules:
+  {{- range $ingHosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+        {{- range .paths }}
+          - path: {{ .path | default "/" | quote }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: web-frontend
+                port:
+                  number: 80
+        {{- end }}
+  {{- end }}
+{{- end }}
