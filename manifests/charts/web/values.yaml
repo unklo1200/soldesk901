@@ -1,40 +1,61 @@
 replicaCount: 2
+
 image:
   repository: ghcr.io/unklo1200/web-updated
   tag: v16
   pullPolicy: IfNotPresent
+
 imagePullSecrets:
   - name: ghcr-pull-secret
+
 containerPort: 8080
-backend:
-  protocol: http
-  host: was.projecteks.local
-  port: 8000
+
 nodeSelector:
   workload: web
+
 tolerations:
   - key: dedicated
     operator: Equal
     value: web
     effect: NoSchedule
+
+# 서비스 타입/포트 명시 (ALB는 Ingress → Service(ClusterIP)로 라우팅)
+service:
+  type: ClusterIP
+  port: 80
+
+# 프로브를 충분히 느긋하게
 probes:
   path: /
-  portName: http
+  readiness:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 3
+  liveness:
+    initialDelaySeconds: 120
+    periodSeconds: 30
+    timeoutSeconds: 5
+  startup:
+    enabled: true
+    failureThreshold: 60
+    periodSeconds: 5
+    timeoutSeconds: 3
+
+# 리소스도 여유 있게
 resources:
   requests:
-    cpu: 100m
-    memory: 128Mi
-  limits:
-    cpu: 500m
+    cpu: 150m
     memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
 ingress:
   className: alb
   annotations:
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/healthcheck-path: /
-    # 필요 시 퍼블릭 서브넷 명시 (자동발견 이슈 있을 때)
-    # alb.ingress.kubernetes.io/subnets: subnet-aaaa,subnet-bbbb
     external-dns.alpha.kubernetes.io/hostname: soldesk901-1.cloud
   hosts:
     - host: soldesk901-1.cloud
@@ -43,7 +64,9 @@ ingress:
           pathType: Prefix
   tls: []
   enabled: true
+
 mode: direct
+
 nlbWatcher:
   enabled: true
   image: bitnami/kubectl:latest
@@ -52,6 +75,7 @@ nlbWatcher:
   targetServiceName: was-api-nlb
   targetPort: 80
   outFile: /opt/web-shared/api_base
+
 redis:
   enabled: true
   host: redis.redis.svc.cluster.local

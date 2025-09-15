@@ -1,6 +1,7 @@
 {{- /* ===== SAFE HELPERS ===== */ -}}
 {{- $vals := .Values -}}
 {{- $mode := default "direct" (get $vals "mode") -}}
+
 {{- /* sidecar/envoy 안전 가드 */ -}}
 {{- $hasSidecar := and (hasKey $vals "sidecar") (kindIs "map" (get $vals "sidecar")) -}}
 {{- $sidecar := ternary (get $vals "sidecar") (dict) $hasSidecar -}}
@@ -12,6 +13,7 @@
 {{- $envoyImage := default "envoyproxy/envoy:v1.30-latest" (get $envoy "image") -}}
 {{- $envoyUpHost := default "example.com" (get $envoy "upstreamHost") -}}
 {{- $envoyUpPort := default 80 (get $envoy "upstreamPort") -}}
+
 {{- /* nlbWatcher 안전 가드 */ -}}
 {{- $hasNlb := and (hasKey $vals "nlbWatcher") (kindIs "map" (get $vals "nlbWatcher")) -}}
 {{- $nlb := ternary (get $vals "nlbWatcher") (dict) $hasNlb -}}
@@ -22,17 +24,43 @@
 {{- $nlbImg := default "bitnami/kubectl:latest" (get $nlb "image") -}}
 {{- $nlbPoll := default 20 (get $nlb "pollInterval") -}}
 {{- $nlbPort := default 80 (get $nlb "targetPort") -}}
+
 {{- /* redis 안전 가드 */ -}}
 {{- $hasRedis := and (hasKey $vals "redis") (kindIs "map" (get $vals "redis")) -}}
 {{- $redis := ternary (get $vals "redis") (dict) $hasRedis -}}
 {{- $redisEnabled := default false (get $redis "enabled") -}}
+
 {{- /* ingress 안전 가드 */ -}}
 {{- $hasIng := and (hasKey $vals "ingress") (kindIs "map" (get $vals "ingress")) -}}
 {{- $ing := ternary (get $vals "ingress") (dict) $hasIng -}}
 {{- $ingEnabled := default false (get $ing "enabled") -}}
 {{- $ingClass := get $ing "className" -}}
-{{- $ingAnn := get $ing "annotations" -}}
+{{- $ingAnn := get $ing "annotations" | default (dict) -}}
 {{- $ingHosts := default (list) (get $ing "hosts") -}}
+{{- $ingTLS := get $ing "tls" -}}
+
+{{- /* probes (values로 튜닝) */ -}}
+{{- $probes := default (dict) (get $vals "probes") -}}
+{{- $probePath := default "/" (get $probes "path") -}}
+{{- $readiness := default (dict) (get $probes "readiness") -}}
+{{- $liveness  := default (dict) (get $probes "liveness") -}}
+{{- $startup   := default (dict) (get $probes "startup") -}}
+{{- $startupEnabled := default true (get $startup "enabled") -}}
+{{- $rInit := default 10 (get $readiness "initialDelaySeconds") -}}
+{{- $rPeriod := default 10 (get $readiness "periodSeconds") -}}
+{{- $rTimeout := default 1 (get $readiness "timeoutSeconds") -}}
+{{- $lInit := default 30 (get $liveness "initialDelaySeconds") -}}
+{{- $lPeriod := default 30 (get $liveness "periodSeconds") -}}
+{{- $lTimeout := default 1 (get $liveness "timeoutSeconds") -}}
+{{- $sFail := default 60 (get $startup "failureThreshold") -}}
+{{- $sPeriod := default 3 (get $startup "periodSeconds") -}}
+{{- $sTimeout := default 2 (get $startup "timeoutSeconds") -}}
+
+{{- /* service 옵션 */ -}}
+{{- $svc := default (dict) (get $vals "service") -}}
+{{- $svcType := default "ClusterIP" (get $svc "type") -}}
+{{- $svcPort := default 80 (get $svc "port") -}}
+
 {{- /* ===== Envoy ConfigMap (envoy 모드 + enabled) ===== */ -}}
 {{- if and (eq $mode "envoy") $envoyEnabled }}
 apiVersion: v1
@@ -86,6 +114,7 @@ data:
           port_value: {{ $envoyAdmin }}
 ---
 {{- end }}
+
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -120,6 +149,7 @@ subjects:
     namespace: {{ .Release.Namespace }}
 ---
 {{- end }}
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -186,18 +216,31 @@ spec:
               mountPath: /opt/web-shared
           readinessProbe:
             httpGet:
-              path: {{ default "/" (get (get $vals "probes") "path") }}
+              path: {{ $probePath }}
               port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
+            initialDelaySeconds: {{ $rInit }}
+            periodSeconds: {{ $rPeriod }}
+            timeoutSeconds: {{ $rTimeout }}
           livenessProbe:
             httpGet:
-              path: {{ default "/" (get (get $vals "probes") "path") }}
+              path: {{ $probePath }}
               port: http
-            initialDelaySeconds: 30
-            periodSeconds: 30
+            initialDelaySeconds: {{ $lInit }}
+            periodSeconds: {{ $lPeriod }}
+            timeoutSeconds: {{ $lTimeout }}
+          {{- if $startupEnabled }}
+          startupProbe:
+            httpGet:
+              path: {{ $probePath }}
+              port: http
+            failureThreshold: {{ $sFail }}
+            periodSeconds: {{ $sPeriod }}
+            timeoutSeconds: {{ $sTimeout }}
+          {{- end }}
+          {{- with (get $vals "resources") }}
           resources:
-{{ toYaml (get $vals "resources") | nindent 12 }}
+{{ toYaml . | nindent 12 }}
+          {{- end }}
         {{- if and (eq $mode "envoy") $envoyEnabled }}
         - name: envoy
           image: "{{ $envoyImage }}"
@@ -273,10 +316,10 @@ metadata:
 spec:
   selector:
     app: web
-  type: ClusterIP
+  type: {{ $svcType }}
   ports:
     - name: http
-      port: 80
+      port: {{ $svcPort }}
       targetPort: http
 ---
 {{- if $ingEnabled }}
@@ -293,6 +336,10 @@ spec:
   {{- if $ingClass }}
   ingressClassName: {{ $ingClass | quote }}
   {{- end }}
+  {{- with $ingTLS }}
+  tls:
+{{ toYaml . | nindent 4 }}
+  {{- end }}
   rules:
   {{- range $ingHosts }}
     - host: {{ .host | quote }}
@@ -305,7 +352,7 @@ spec:
               service:
                 name: web-frontend
                 port:
-                  number: 80
+                  number: {{ $svcPort }}
         {{- end }}
   {{- end }}
 {{- end }}
