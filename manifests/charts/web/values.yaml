@@ -24,24 +24,27 @@ service:
   type: ClusterIP
   port: 80
 
-# 프로브를 충분히 느긋하게
+# 프로브: 초기 부하/콜드스타트까지 넉넉히
 probes:
   path: /
   readiness:
-    initialDelaySeconds: 30
+    initialDelaySeconds: 45
     periodSeconds: 10
-    timeoutSeconds: 3
-  liveness:
-    initialDelaySeconds: 120
-    periodSeconds: 30
     timeoutSeconds: 5
+    failureThreshold: 10
+  liveness:
+    tcp: true               # 템플릿에서 tcpSocket으로 분기
+    initialDelaySeconds: 180
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 6
   startup:
     enabled: true
-    failureThreshold: 60
+    failureThreshold: 120
     periodSeconds: 5
     timeoutSeconds: 3
 
-# 리소스도 여유 있게
+# 리소스 여유
 resources:
   requests:
     cpu: 150m

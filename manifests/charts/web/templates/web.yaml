@@ -214,6 +214,8 @@ spec:
           volumeMounts:
             - name: web-shared
               mountPath: /opt/web-shared
+
+          # --- Readiness: HTTP 유지 ---
           readinessProbe:
             httpGet:
               path: {{ $probePath }}
@@ -221,13 +223,21 @@ spec:
             initialDelaySeconds: {{ $rInit }}
             periodSeconds: {{ $rPeriod }}
             timeoutSeconds: {{ $rTimeout }}
+
+          # --- Liveness: values로 tcp 전환 가능 ---
           livenessProbe:
+          {{- if (get $liveness "tcp") }}
+            tcpSocket:
+              port: http
+          {{- else }}
             httpGet:
               path: {{ $probePath }}
               port: http
+          {{- end }}
             initialDelaySeconds: {{ $lInit }}
             periodSeconds: {{ $lPeriod }}
             timeoutSeconds: {{ $lTimeout }}
+
           {{- if $startupEnabled }}
           startupProbe:
             httpGet:
@@ -237,10 +247,12 @@ spec:
             periodSeconds: {{ $sPeriod }}
             timeoutSeconds: {{ $sTimeout }}
           {{- end }}
+
           {{- with (get $vals "resources") }}
           resources:
 {{ toYaml . | nindent 12 }}
           {{- end }}
+
         {{- if and (eq $mode "envoy") $envoyEnabled }}
         - name: envoy
           image: "{{ $envoyImage }}"
@@ -267,6 +279,7 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 20
         {{- end }}
+
         {{- if and (eq $mode "direct") $nlbEnabled }}
         - name: nlb-watcher
           image: "{{ $nlbImg }}"
@@ -338,7 +351,7 @@ spec:
   {{- end }}
   {{- with $ingTLS }}
   tls:
-{{ toYaml . | nindent 4 }}
+{{ toYaml . | nindent 2 }}
   {{- end }}
   rules:
   {{- range $ingHosts }}
