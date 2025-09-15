@@ -20,7 +20,7 @@ spec:
         ng: "web"
       containers:
         - name: web
-          image: ghcr.io/unklo1200/web:v16   # ← 너 이미지로 교체 가능
+          image: ghcr.io/unklo1200/web-updated:v16   # ← 너 이미지로 교체 가능
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080              # ← 앱 포트에 맞게 조정

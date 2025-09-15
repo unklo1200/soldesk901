@@ -1,0 +1,73 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: was
+type: Opaque
+stringData:
+  DB_HOST: "REPLACE_ME_RDS_ENDPOINT"
+  DB_USER: "admin"
+  DB_PASS: "adminadmin"
+  DB_NAME: "test"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: was
+  namespace: was
+  labels: { app: was }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: was }
+  template:
+    metadata:
+      labels: { app: was }
+    spec:
+      nodeSelector:
+        ng: "was"
+      containers:
+        - name: was
+          image: ghcr.io/unklo1200/was-updated:v12
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DB_HOST
+              valueFrom: { secretKeyRef: { name: db-credentials, key: DB_HOST } }
+            - name: DB_USER
+              valueFrom: { secretKeyRef: { name: db-credentials, key: DB_USER } }
+            - name: DB_PASS
+              valueFrom: { secretKeyRef: { name: db-credentials, key: DB_PASS } }
+            - name: DB_NAME
+              valueFrom: { secretKeyRef: { name: db-credentials, key: DB_NAME } }
+            - name: REDIS_HOST
+              value: "redis.was.svc.cluster.local"
+            - name: REDIS_PORT
+              value: "6379"
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: was-nlb
+  namespace: was
+  labels: { app: was }
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"  # 내부 NLB
+spec:
+  selector: { app: was }
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+  type: LoadBalancer

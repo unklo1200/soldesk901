@@ -4,7 +4,7 @@ image:
   tag: v16
   pullPolicy: IfNotPresent
 imagePullSecrets:
-- name: ghcr-pull-secret
+  - name: ghcr-pull-secret
 containerPort: 8080
 backend:
   protocol: http
@@ -13,10 +13,10 @@ backend:
 nodeSelector:
   workload: web
 tolerations:
-- key: dedicated
-  operator: Equal
-  value: web
-  effect: NoSchedule
+  - key: dedicated
+    operator: Equal
+    value: web
+    effect: NoSchedule
 probes:
   path: /
   portName: http
@@ -30,12 +30,17 @@ resources:
 ingress:
   className: alb
   annotations:
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    # 필요 시 퍼블릭 서브넷 명시 (자동발견 이슈 있을 때)
+    # alb.ingress.kubernetes.io/subnets: subnet-aaaa,subnet-bbbb
     external-dns.alpha.kubernetes.io/hostname: soldesk901-1.cloud
   hosts:
-  - host: soldesk901-1.cloud
-    paths:
-    - path: /
-      pathType: Prefix
+    - host: soldesk901-1.cloud
+      paths:
+        - path: /
+          pathType: Prefix
   tls: []
   enabled: true
 mode: direct
