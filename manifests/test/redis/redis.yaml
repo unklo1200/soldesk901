@@ -1,0 +1,40 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: was
+  labels: { app: redis }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: redis }
+  template:
+    metadata:
+      labels: { app: redis }
+    spec:
+      nodeSelector:
+        ng: "was"
+      containers:
+        - name: redis
+          image: bitnami/redis:7.2.5
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+          env:
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "yes"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: was
+  labels: { app: redis }
+spec:
+  selector: { app: redis }
+  ports:
+    - name: tcp
+      port: 6379
+      targetPort: 6379
+  type: ClusterIP
