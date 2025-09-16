@@ -35,7 +35,7 @@ metadata:
   name: web-nlb-service-reader
 rules:
   - apiGroups: [""]
-    resources: ["services","endpoints"] # endpoints 권한 추가
+    resources: ["services","endpoints"]
     verbs: ["get","list","watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -68,10 +68,6 @@ spec:
     metadata:
       labels:
         app: "web"
-      {{- with $v.podAnnotations }}
-      annotations:
-{{ toYaml . | nindent 8 }}
-      {{- end }}
     spec:
       serviceAccountName: web-frontend
 
@@ -92,7 +88,6 @@ spec:
           args:
             - |
               mkdir -p /opt/web-shared
-              # 내부 FQDN 기본값 (NLB가 준비되기 전 안전장치)
               echo "http://{{ default "was-api-nlb" ($nlb.targetServiceName) }}.{{ default "was" ($nlb.targetServiceNamespace) }}.svc.cluster.local:{{ default 80 ($nlb.targetPort) }}" > /opt/web-shared/api_base
           volumeMounts:
             - name: web-shared
@@ -122,9 +117,9 @@ spec:
             {{- with $v.redis }}
             {{- if .enabled }}
             - name: REDIS_HOST
-              value: "{{ default "" .host }}"
+              value: "{{ .host }}"
             - name: REDIS_PORT
-              value: "{{ default 6379 .port }}"
+              value: "{{ .port }}"
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -138,51 +133,38 @@ spec:
               value: "{{ .value }}"
             {{- end }}
             {{- end }}
-
           volumeMounts:
             - name: web-shared
               mountPath: "/opt/web-shared"
 
-          # Readiness
           readinessProbe:
             {{- if default false ($rd.tcp) }}
-            tcpSocket:
-              port: "http"
+            tcpSocket: { port: "http" }
             {{- else }}
-            httpGet:
-              path: "{{ $probePath }}"
-              port: "http"
+            httpGet: { path: "{{ $probePath }}", port: "http" }
             {{- end }}
             initialDelaySeconds: {{ default 10 ($rd.initialDelaySeconds) }}
             periodSeconds: {{ default 10 ($rd.periodSeconds) }}
             timeoutSeconds: {{ default 1  ($rd.timeoutSeconds) }}
             failureThreshold: {{ default 3 ($rd.failureThreshold) }}
 
-          # Liveness
           livenessProbe:
             {{- if default false ($lv.tcp) }}
-            tcpSocket:
-              port: "http"
+            tcpSocket: { port: "http" }
             {{- else }}
-            httpGet:
-              path: "{{ $probePath }}"
-              port: "http"
+            httpGet: { path: "{{ $probePath }}", port: "http" }
             {{- end }}
             initialDelaySeconds: {{ default 30 ($lv.initialDelaySeconds) }}
             periodSeconds: {{ default 30 ($lv.periodSeconds) }}
             timeoutSeconds: {{ default 1  ($lv.timeoutSeconds) }}
             failureThreshold: {{ default 3 ($lv.failureThreshold) }}
 
-          # Startup
           {{- if default true ($st.enabled) }}
           startupProbe:
             {{- if default false ($st.tcp) }}
-            tcpSocket:
-              port: "http"
+            tcpSocket: { port: "http" }
             {{- else }}
-            httpGet:
-              path: "{{ $probePath }}"
-              port: "http"
+            httpGet: { path: "{{ $probePath }}", port: "http" }
             {{- end }}
             failureThreshold: {{ default 60 ($st.failureThreshold) }}
             periodSeconds:   {{ default 3  ($st.periodSeconds) }}
@@ -210,7 +192,7 @@ spec:
           command: ["/bin/sh","-c"]
           args:
             - >
-              set -euo pipefail;
+              set -eu;
               echo "Starting NLB watcher...";
               while true; do
                 OUT="$(kubectl get svc $SVC_NAME -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>&1 || true)";
