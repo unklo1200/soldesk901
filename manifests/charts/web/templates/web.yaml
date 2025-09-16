@@ -1,6 +1,7 @@
 {{- /* ===== SAFE HELPERS ===== */ -}}
 {{- $vals := .Values -}}
 {{- $mode := default "direct" (get $vals "mode") -}}
+{{- $cport := default 80 (get $vals "containerPort") -}}
 
 {{- /* sidecar/envoy 안전 가드 */ -}}
 {{- $hasSidecar := and (hasKey $vals "sidecar") (kindIs "map" (get $vals "sidecar")) -}}
@@ -39,6 +40,10 @@
 {{- $ingHosts := default (list) (get $ing "hosts") -}}
 {{- $ingTLS := get $ing "tls" -}}
 
+{{- /* server/env */ -}}
+{{- $server := default (dict) (get $vals "server") -}}
+{{- $serverHost := default "0.0.0.0" (get $server "host") -}}
+
 {{- /* probes (values로 튜닝) */ -}}
 {{- $probes := default (dict) (get $vals "probes") -}}
 {{- $probePath := default "/" (get $probes "path") -}}
@@ -46,12 +51,17 @@
 {{- $liveness  := default (dict) (get $probes "liveness") -}}
 {{- $startup   := default (dict) (get $probes "startup") -}}
 {{- $startupEnabled := default true (get $startup "enabled") -}}
+{{- $rdTcp := default false (get $readiness "tcp") -}}
+{{- $lvTcp := default false (get $liveness "tcp") -}}
+{{- $stTcp := default false (get $startup "tcp") -}}
 {{- $rInit := default 10 (get $readiness "initialDelaySeconds") -}}
 {{- $rPeriod := default 10 (get $readiness "periodSeconds") -}}
 {{- $rTimeout := default 1 (get $readiness "timeoutSeconds") -}}
+{{- $rFail := default 3 (get $readiness "failureThreshold") -}}
 {{- $lInit := default 30 (get $liveness "initialDelaySeconds") -}}
 {{- $lPeriod := default 30 (get $liveness "periodSeconds") -}}
 {{- $lTimeout := default 1 (get $liveness "timeoutSeconds") -}}
+{{- $lFail := default 3 (get $liveness "failureThreshold") -}}
 {{- $sFail := default 60 (get $startup "failureThreshold") -}}
 {{- $sPeriod := default 3 (get $startup "periodSeconds") -}}
 {{- $sTimeout := default 2 (get $startup "timeoutSeconds") -}}
@@ -190,7 +200,7 @@ spec:
           imagePullPolicy: {{ (get $vals "image").pullPolicy | default "IfNotPresent" }}
           ports:
             - name: http
-              containerPort: {{ default 80 (get $vals "containerPort") }}
+              containerPort: {{ $cport }}
               protocol: TCP
           env:
           {{- if eq $mode "envoy" }}
@@ -200,6 +210,10 @@ spec:
             - name: API_BASE_FILE
               value: "/opt/web-shared/api_base"
           {{- end }}
+            - name: PORT
+              value: "{{ $cport }}"
+            - name: HOST
+              value: "{{ $serverHost }}"
           {{- if $redisEnabled }}
             - name: REDIS_HOST
               value: "{{ default "" (get $redis "host") }}"
@@ -211,22 +225,34 @@ spec:
                   name: {{ default "redis-auth" (get $redis "secretName") }}
                   key: {{ default "REDIS_PASSWORD" (get $redis "secretKey") }}
           {{- end }}
+          {{- with (get $vals "extraEnv") }}
+          {{- range . }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+          {{- end }}
+          {{- end }}
           volumeMounts:
             - name: web-shared
               mountPath: /opt/web-shared
 
-          # --- Readiness: HTTP 유지 ---
+          {{- /* Readiness */ -}}
           readinessProbe:
+          {{- if $rdTcp }}
+            tcpSocket:
+              port: http
+          {{- else }}
             httpGet:
               path: {{ $probePath }}
               port: http
+          {{- end }}
             initialDelaySeconds: {{ $rInit }}
             periodSeconds: {{ $rPeriod }}
             timeoutSeconds: {{ $rTimeout }}
+            failureThreshold: {{ $rFail }}
 
-          # --- Liveness: values로 tcp 전환 가능 ---
+          {{- /* Liveness */ -}}
           livenessProbe:
-          {{- if (get $liveness "tcp") }}
+          {{- if $lvTcp }}
             tcpSocket:
               port: http
           {{- else }}
@@ -237,12 +263,19 @@ spec:
             initialDelaySeconds: {{ $lInit }}
             periodSeconds: {{ $lPeriod }}
             timeoutSeconds: {{ $lTimeout }}
+            failureThreshold: {{ $lFail }}
 
+          {{- /* Startup */ -}}
           {{- if $startupEnabled }}
           startupProbe:
+          {{- if $stTcp }}
+            tcpSocket:
+              port: http
+          {{- else }}
             httpGet:
               path: {{ $probePath }}
               port: http
+          {{- end }}
             failureThreshold: {{ $sFail }}
             periodSeconds: {{ $sPeriod }}
             timeoutSeconds: {{ $sTimeout }}
@@ -351,7 +384,7 @@ spec:
   {{- end }}
   {{- with $ingTLS }}
   tls:
-{{ toYaml . | nindent 2 }}
+{{ toYaml . | nindent 4 }}
   {{- end }}
   rules:
   {{- range $ingHosts }}

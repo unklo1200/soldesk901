@@ -8,7 +8,12 @@ image:
 imagePullSecrets:
   - name: ghcr-pull-secret
 
+# 앱이 반드시 이 포트로 리슨하도록 강제 (PORT env로도 주입됨)
 containerPort: 8080
+
+# 앱 바인딩 호스트 (HOST env)
+server:
+  host: 0.0.0.0
 
 nodeSelector:
   workload: web
@@ -19,32 +24,34 @@ tolerations:
     value: web
     effect: NoSchedule
 
-# 서비스 타입/포트 명시 (ALB는 Ingress → Service(ClusterIP)로 라우팅)
+# 서비스 타입/포트
 service:
   type: ClusterIP
   port: 80
 
-# 프로브: 초기 부하/콜드스타트까지 넉넉히
+# 프로브: HTTP 대신 TCP로 완화 (안정화 후 readiness만 HTTP로 되돌려도 됨)
 probes:
   path: /
   readiness:
-    initialDelaySeconds: 45
+    tcp: true
+    initialDelaySeconds: 60
     periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 10
+    timeoutSeconds: 10
+    failureThreshold: 20
   liveness:
-    tcp: true               # 템플릿에서 tcpSocket으로 분기
-    initialDelaySeconds: 180
+    tcp: true
+    initialDelaySeconds: 240
     periodSeconds: 15
     timeoutSeconds: 5
     failureThreshold: 6
   startup:
     enabled: true
+    tcp: true
     failureThreshold: 120
     periodSeconds: 5
     timeoutSeconds: 3
 
-# 리소스 여유
+# 리소스
 resources:
   requests:
     cpu: 150m
@@ -85,3 +92,6 @@ redis:
   port: 6379
   secretName: redis-auth
   secretKey: REDIS_PASSWORD
+
+# 추가 환경변수 필요시
+extraEnv: []
