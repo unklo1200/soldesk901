@@ -1,4 +1,9 @@
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: was
+---
+apiVersion: v1
 kind: Secret
 metadata:
   name: was-secrets
@@ -80,7 +85,6 @@ spec:
           value: '0'
         - name: TMPDIR
           value: /tmp
-        # :렌치: gunicorn 튜닝: 동시성/타임아웃 여유
         - name: GUNICORN_CMD_ARGS
           value: --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 120 --graceful-timeout 30 --worker-tmp-dir /tmp
         volumeMounts:
@@ -97,7 +101,6 @@ spec:
           preStop:
             exec:
               command: ["/bin/sh","-c","sleep 5"]
-        # :스톱워치: 초기 부팅 충분히 기다림(최대 ~5분)
         startupProbe:
           httpGet:
             path: /health
@@ -105,7 +108,6 @@ spec:
           periodSeconds: 2
           timeoutSeconds: 2
           failureThreshold: 150
-        # :치유_중인_하트: 준비 상태 체크는 /health (느긋하게)
         readinessProbe:
           httpGet:
             path: /health
@@ -114,7 +116,6 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 12
-        # :녹색_하트: 생존 체크는 TCP로 단순화(HTTP 핸들러 지연으로 인한 오탐 방지)
         livenessProbe:
           tcpSocket:
             port: 8000
@@ -148,7 +149,6 @@ metadata:
   name: was-api-nlb
   namespace: was
   annotations:
-    # NLB(ip 타겟) + 내부형. (웹 파드는 VPC 안이므로 내부 NLB로 충분)
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
     service.beta.kubernetes.io/aws-load-balancer-internal: "true"
