@@ -66,6 +66,9 @@ spec:
         app: "web"
     spec:
       serviceAccountName: web-frontend
+      # 공유 볼륨을 그룹 1000으로 소유하게 해서 모든 컨테이너가 쓰기 가능
+      securityContext:
+        fsGroup: 1000
       {{- with $v.imagePullSecrets }}
       imagePullSecrets:
 {{ toYaml . | nindent 8 }}
@@ -80,9 +83,12 @@ spec:
           command: ['sh','-lc']
           args:
             - |
+              set -e
               mkdir -p /opt/web-shared
               # 내부 FQDN 기본값 (NLB가 준비되기 전 안전장치)
               echo "http://{{ default "was-api-nlb" ($nlb.targetServiceName) }}.{{ default "was" ($nlb.targetServiceNamespace) }}.svc.cluster.local:{{ default 80 ($nlb.targetPort) }}" > /opt/web-shared/api_base
+              chown -R 1000:1000 /opt/web-shared
+              chmod -R g+rwX /opt/web-shared
           volumeMounts:
             - name: web-shared
               mountPath: "/opt/web-shared"
@@ -202,18 +208,6 @@ spec:
             - name: web-shared
               mountPath: "/opt/web-shared"
         {{- end }}
-      {{- with $v.nodeSelector }}
-      nodeSelector:
-{{ toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with $v.affinity }}
-      affinity:
-{{ toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with $v.tolerations }}
-      tolerations:
-{{ toYaml . | nindent 8 }}
-      {{- end }}
 ---
 apiVersion: v1
 kind: Service
