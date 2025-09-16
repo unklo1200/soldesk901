@@ -75,8 +75,10 @@ ingress:
   tls: []
   enabled: true
 
+# direct 모드: NLB 주소를 파일로 주입
 mode: direct
 
+# NLB watcher 설정
 nlbWatcher:
   enabled: true
   image: bitnami/kubectl:latest
@@ -85,6 +87,9 @@ nlbWatcher:
   targetServiceName: was-api-nlb
   targetPort: 80
   outFile: /opt/web-shared/api_base
+
+# 초기값을 써두는 initContainer on/off
+initApiBaseEnabled: true
 
 redis:
   enabled: true

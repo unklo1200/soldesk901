@@ -2,19 +2,23 @@
 {{- $v := .Values -}}
 {{- $mode := default "direct" $v.mode -}}
 {{- $cport := default 80 $v.containerPort -}}
+
 {{- $ing := default (dict) $v.ingress -}}
 {{- $ingEnabled := default false ($ing.enabled) -}}
 {{- $ingClass := $ing.className -}}
 {{- $ingAnns  := default (dict) ($ing.annotations) -}}
 {{- $ingHosts := default (list) ($ing.hosts) -}}
 {{- $ingTLS   := $ing.tls -}}
+
 {{- $probes := default (dict) $v.probes -}}
 {{- $probePath := default "/" ($probes.path) -}}
 {{- $rd := default (dict) ($probes.readiness) -}}
 {{- $lv := default (dict) ($probes.liveness) -}}
 {{- $st := default (dict) ($probes.startup) -}}
+
 {{- $nlb := default (dict) $v.nlbWatcher -}}
 {{- $nlbEnabled := default false ($nlb.enabled) -}}
+
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -31,7 +35,7 @@ metadata:
   name: web-nlb-service-reader
 rules:
   - apiGroups: [""]
-    resources: ["services"]
+    resources: ["services","endpoints"] # endpoints 권한 추가
     verbs: ["get","list","watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -70,13 +74,31 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: web-frontend
+
       {{- with $v.imagePullSecrets }}
       imagePullSecrets:
 {{ toYaml . | nindent 8 }}
       {{- end }}
+
       volumes:
         - name: web-shared
           emptyDir: {}
+
+      {{- if (default true $v.initApiBaseEnabled) }}
+      initContainers:
+        - name: init-api-base
+          image: busybox:1.36
+          command: ['sh','-lc']
+          args:
+            - |
+              mkdir -p /opt/web-shared
+              # 내부 FQDN 기본값 (NLB가 준비되기 전 안전장치)
+              echo "http://{{ default "was-api-nlb" ($nlb.targetServiceName) }}.{{ default "was" ($nlb.targetServiceNamespace) }}.svc.cluster.local:{{ default 80 ($nlb.targetPort) }}" > /opt/web-shared/api_base
+          volumeMounts:
+            - name: web-shared
+              mountPath: "/opt/web-shared"
+      {{- end }}
+
       containers:
         - name: web
           image: "{{ $v.image.repository }}:{{ default .Chart.AppVersion $v.image.tag }}"
@@ -116,9 +138,11 @@ spec:
               value: "{{ .value }}"
             {{- end }}
             {{- end }}
+
           volumeMounts:
             - name: web-shared
               mountPath: "/opt/web-shared"
+
           # Readiness
           readinessProbe:
             {{- if default false ($rd.tcp) }}
@@ -133,6 +157,7 @@ spec:
             periodSeconds: {{ default 10 ($rd.periodSeconds) }}
             timeoutSeconds: {{ default 1  ($rd.timeoutSeconds) }}
             failureThreshold: {{ default 3 ($rd.failureThreshold) }}
+
           # Liveness
           livenessProbe:
             {{- if default false ($lv.tcp) }}
@@ -147,6 +172,7 @@ spec:
             periodSeconds: {{ default 30 ($lv.periodSeconds) }}
             timeoutSeconds: {{ default 1  ($lv.timeoutSeconds) }}
             failureThreshold: {{ default 3 ($lv.failureThreshold) }}
+
           # Startup
           {{- if default true ($st.enabled) }}
           startupProbe:
@@ -162,10 +188,12 @@ spec:
             periodSeconds:   {{ default 3  ($st.periodSeconds) }}
             timeoutSeconds:  {{ default 2  ($st.timeoutSeconds) }}
           {{- end }}
+
           {{- with $v.resources }}
           resources:
 {{ toYaml . | nindent 12 }}
           {{- end }}
+
         {{- if and (eq $mode "direct") $nlbEnabled }}
         - name: nlb-watcher
           image: "{{ default "bitnami/kubectl:latest" ($nlb.image) }}"
@@ -182,11 +210,20 @@ spec:
           command: ["/bin/sh","-c"]
           args:
             - >
+              set -euo pipefail;
               echo "Starting NLB watcher...";
               while true; do
-                DNS=$(kubectl get svc $$SVC_NAME -n $$NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true);
-                if [ -n "$$DNS" ]; then
-                  echo "http://$$DNS:$$TARGET_PORT" > $$OUT_FILE;
+                OUT="$(kubectl get svc $SVC_NAME -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>&1 || true)";
+                if echo "$OUT" | grep -qiE 'forbidden|error'; then
+                  echo "[watcher] kubectl error: $OUT" >&2;
+                  sleep 10; continue;
+                fi;
+                DNS="$OUT";
+                if [ -n "$DNS" ]; then
+                  echo "http://$DNS:$TARGET_PORT" > "$OUT_FILE";
+                  echo "[watcher] wrote $OUT_FILE = http://$DNS:$TARGET_PORT";
+                else
+                  echo "[watcher] hostname empty; retrying...";
                 fi;
                 sleep {{ default 20 ($nlb.pollInterval) }};
               done
@@ -194,6 +231,7 @@ spec:
             - name: web-shared
               mountPath: "/opt/web-shared"
         {{- end }}
+
       {{- with $v.nodeSelector }}
       nodeSelector:
 {{ toYaml . | nindent 8 }}
